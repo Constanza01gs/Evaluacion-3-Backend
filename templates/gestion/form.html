@@ -1,0 +1,8 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-title-bar"><div><h2>{% if objeto %}Editar{% else %}Nuevo registro: {% endif %} {{ titulo }}</h2></div></div>
+<div class="card" style="max-width:720px"><form method="post">{% csrf_token %}
+{% if form.non_field_errors %}<div role="alert">{{ form.non_field_errors }}</div>{% endif %}
+{% for field in form %}<div class="form-field {% if field.field.widget.input_type == 'checkbox' %}form-checkbox{% endif %}">{% if field.field.widget.input_type == 'checkbox' %}<div class="checkbox-row">{{ field }}<label for="{{ field.id_for_label }}">{{ field.label }}</label></div>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{{ field }}{% endif %}{% if field.help_text %}<small class="field-help">{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<div role="alert" class="field-error">{{ error }}</div>{% endfor %}</div>{% endfor %}
+<button class="btn btn-primary" type="submit">Guardar</button> {% if modulo == 'clases' %}<a class="btn btn-outline" href="{% url 'clases_list' %}">Cancelar</a>{% else %}<a class="btn btn-outline" href="{% url 'gestion_list' modulo %}">Cancelar</a>{% endif %}</form></div>
+{% endblock %}

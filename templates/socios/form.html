@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}{% if socio %}Editar socio{% else %}Nuevo socio{% endif %} - FitLife{% endblock %}
+{% block content %}
+<div class="page-title-bar"><div><h2>{% if socio %}Editar socio{% else %}Nuevo socio{% endif %}</h2><p class="page-subtitle">Datos de contacto del socio</p></div></div>
+<div class="card" style="max-width: 720px;">
+  <form method="post">{% csrf_token %}
+    {% if form.non_field_errors %}<div role="alert">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form %}
+      <div class="form-field">
+        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+        {{ field }}
+        {% if field.help_text %}<small class="field-help">{{ field.help_text }}</small>{% endif %}
+        {% for error in field.errors %}<div role="alert" style="color:#b91c1c">{{ error }}</div>{% endfor %}
+      </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Guardar socio</button>
+    <a href="{% url 'socios_list' %}" class="btn btn-outline">Cancelar</a>
+  </form>
+</div>
+{% endblock %}

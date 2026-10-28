@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirmar Baja Lógica - FitLife{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 40px auto;">
+    <div class="card" style="border: 2px solid #FECACA;">
+        <div class="card-title-box">
+            <h3 class="card-title" style="color: #991B1B;">Confirmar Baja Lógica de Socio</h3>
+        </div>
+
+        <p style="font-size: 0.95rem; color: #334155; line-height: 1.5; margin-bottom: 20px;">
+            ¿Estás seguro/a de que deseas dar de <strong>baja lógica</strong> al socio:
+        </p>
+
+        <div style="background-color: #F8FAFC; border-radius: 12px; padding: 18px; margin-bottom: 24px; border: 1px solid #E2E8F0;">
+            <div style="font-size: 1.2rem; font-weight: 800; color: #0B192C;">{{ socio.nombre_completo }}</div>
+            <div style="color: #64748B; font-size: 0.88rem; margin-top: 4px;">RUT: {{ socio.rut }} | ID: #{{ socio.id }}</div>
+            <div style="color: #64748B; font-size: 0.88rem;">Email: {{ socio.email }}</div>
+        </div>
+
+        <div class="fl-alert fl-alert-warning" style="font-size: 0.85rem;">
+            <strong>Nota de diseño pedagógico:</strong> La baja lógica desactiva al socio para nuevos accesos y reservas, pero <strong>conserva permanentemente</strong> su historial de pagos, asistencias y clases para auditoría.
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+                <a href="{% url 'socios_list' %}" class="btn btn-outline">Cancelar</a>
+                <button type="submit" class="btn btn-danger">Confirmar Desactivación</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

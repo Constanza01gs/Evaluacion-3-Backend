@@ -1,0 +1,8 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card" style="max-width:650px"><h2>Confirmar acción</h2>
+<p>¿Deseas {{ accion }} este registro?</p><p><strong>{{ objeto }}</strong></p>
+<p>La desactivación conserva el historial. Algunas acciones pueden estar bloqueadas si hay registros relacionados en uso.</p>
+<form method="post">{% csrf_token %}<button class="btn btn-primary" type="submit">Confirmar</button>
+{% if modulo == 'clases' %}<a class="btn btn-outline" href="{% url 'clases_list' %}">Cancelar</a>{% else %}<a class="btn btn-outline" href="{% url 'gestion_list' modulo %}">Cancelar</a>{% endif %}</form></div>
+{% endblock %}

@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Clases y Reservas - FitLife{% endblock %}
+
+{% block content %}
+<div class="page-title-bar">
+    <div>
+        <h2>Clases Grupales y Reservas</h2>
+        <div class="page-subtitle">Gestión de cupos, reservas concurrentes y lista de espera automatizada (FIFO)</div>
+    </div>
+    {% if es_admin %}<a class="btn btn-primary" href="{% url 'gestion_nuevo' 'clases' %}">+ Nueva clase</a>{% endif %}
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 24px;">
+    {% if es_admin %}<form method="get" class="filter-bar"><select name="estado" class="filter-select" aria-label="Estado de las clases"><option value="">Clases activas</option><option value="inactivas" {% if ver_inactivas %}selected{% endif %}>Clases desactivadas</option></select><button class="btn btn-primary" type="submit">Filtrar</button></form>{% endif %}
+    {% for clase in clases %}
+        <div class="card">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 18px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div class="avatar-circle" style="width: 48px; height: 48px; font-size: 1.1rem; background-color: #0284C7;">
+                        {{ clase.nombre|slice:":2"|upper }}
+                    </div>
+                    <div>
+                        <h3 style="font-size: 1.3rem; font-weight: 800; color: #0B192C;">{{ clase.nombre }}</h3>
+                        <div style="font-size: 0.85rem; color: #64748B;">
+                            Prof. {{ clase.profesor.nombres }} {{ clase.profesor.apellidos }} &bull; Sala: {{ clase.sala }} &bull; {{ clase.duracion_minutos }} min
+                            {% if es_admin %}{% if clase.activo %} &bull; <a href="{% url 'gestion_editar' 'clases' clase.id %}">Editar clase</a> &bull; <a href="{% url 'gestion_estado' 'clases' clase.id 'desactivar' %}">Desactivar</a>{% else %} &bull; <a href="{% url 'gestion_estado' 'clases' clase.id 'restaurar' %}">Restaurar</a>{% endif %}{% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cupos y Horario -->
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="text-align: right;">
+                        <div style="font-family: monospace; font-size: 1.1rem; font-weight: 800; color: #0B192C;">
+                            {{ clase.fecha|date:"d/m" }} &bull; {{ clase.hora_inicio|time:"H:i" }} - {{ clase.hora_fin|time:"H:i" }}
+                        </div>
+                        <div style="margin-top: 4px;">
+                            {% if clase.esta_llena %}
+                                <span class="badge badge-danger">Clase Llena</span>
+                            {% else %}
+                                <span class="badge badge-success">{{ clase.cupos_disponibles }} cupos disponibles</span>
+                            {% endif %}
+                            {% if clase.total_en_espera > 0 %}
+                                <span class="badge badge-warning">{{ clase.total_en_espera }} en espera</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Formulario de reserva rápida para el socio -->
+                    {% if clase.activo %}<form action="{% url 'reservar_clase_web' clase.id %}" method="POST" style="display: flex; gap: 8px;">
+                        {% csrf_token %}
+                        <select name="socio_id" class="form-control" style="width: 220px; font-size: 0.85rem;" required>
+                            <option value="">Seleccionar socio...</option>
+                            {% for socio in socios %}
+                                <option value="{{ socio.id }}">{{ socio.nombre_completo }} ({{ socio.rut }})</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.85rem;">
+                            Reservar
+                        </button>
+                    </form>{% endif %}
+                </div>
+            </div>
+
+            <!-- Listado de Asistentes y Lista de Espera -->
+            <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px;">
+                <!-- Confirmados -->
+                <div>
+                    <h4 style="font-size: 0.95rem; font-weight: 700; color: #065F46; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                        <span>Cupos Confirmados ({{ clase.total_confirmadas }}/{{ clase.capacidad_maxima }})</span>
+                    </h4>
+                    <div style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+                        {% for res in clase.reservas.all %}
+                            {% if res.estado == 'CONFIRMADA' %}
+                                <div style="display: flex; align-items: center; justify-content: space-between; background-color: #F8FAFC; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="legend-dot dot-green"></span>
+                                        <strong>{{ res.socio.nombre_completo }}</strong>
+                                        <span style="color: #64748B; font-size: 0.78rem;">({{ res.socio.rut }})</span>
+                                    </div>
+                                    <form action="{% url 'cancelar_reserva_web' res.id %}" method="POST" style="margin: 0;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-outline" style="padding: 2px 8px; font-size: 0.72rem; color: #DC2626; border-color: #FECACA;" title="Cancela y promueve automáticamente de la lista de espera">
+                                            Cancelar cupo
+                                        </button>
+                                    </form>
+                                </div>
+                            {% endif %}
+                        {% empty %}
+                            <p style="font-size: 0.85rem; color: #94A3B8;">Sin reservas confirmadas aún.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Lista de Espera FIFO -->
+                <div style="background-color: #FFFBEB; border: 1px solid #FDE68A; border-radius: 12px; padding: 14px;">
+                    <h4 style="font-size: 0.95rem; font-weight: 700; color: #92400E; margin-bottom: 10px;">
+                        Lista de Espera Automatizada (FIFO: Primer en llegar, primero en entrar)
+                    </h4>
+                    <div style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; counter-reset: espera;">
+                        {% for res in clase.reservas.all %}
+                            {% if res.estado == 'LISTA_ESPERA' %}
+                                <div style="display: flex; align-items: center; justify-content: space-between; background-color: #FFFFFF; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; border: 1px solid #FEF3C7;">
+                                    <div>
+                                        <span class="numero-espera" aria-hidden="true"></span>
+                                        <strong>{{ res.socio.nombre_completo }}</strong>
+                                        <div style="font-size: 0.72rem; color: #78716C;">Solicitado: {{ res.fecha_reserva|time:"H:i:s" }}</div>
+                                    </div>
+                                    <form action="{% url 'cancelar_reserva_web' res.id %}" method="POST" style="margin: 0;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-outline" style="padding: 2px 8px; font-size: 0.72rem; color: #92400E; border-color: #FDE68A;">
+                                            Retirar
+                                        </button>
+                                    </form>
+                                </div>
+                            {% endif %}
+                        {% empty %}
+                            <p style="font-size: 0.82rem; color: #B45309;">No hay personas en lista de espera.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="card">
+            <p style="text-align: center; color: #64748B; padding: 30px;">No hay clases grupales programadas.</p>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

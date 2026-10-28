@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Restaurar Socio - FitLife{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 40px auto;">
+    <div class="card" style="border: 2px solid #A7F3D0;">
+        <div class="card-title-box">
+            <h3 class="card-title" style="color: #065F46;">Restaurar Socio Inactivo</h3>
+        </div>
+
+        <p style="font-size: 0.95rem; color: #334155; line-height: 1.5; margin-bottom: 20px;">
+            ¿Deseas reactivar al siguiente socio en el sistema?
+        </p>
+
+        <div style="background-color: #F8FAFC; border-radius: 12px; padding: 18px; margin-bottom: 24px; border: 1px solid #E2E8F0;">
+            <div style="font-size: 1.2rem; font-weight: 800; color: #0B192C;">{{ socio.nombre_completo }}</div>
+            <div style="color: #64748B; font-size: 0.88rem; margin-top: 4px;">RUT: {{ socio.rut }} | ID: #{{ socio.id }}</div>
+            <div style="color: #64748B; font-size: 0.88rem;">Baja registrada el: {{ socio.fecha_eliminacion|date:"d/m/Y H:i"|default:"Previa" }}</div>
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+                <a href="{% url 'socios_list' %}" class="btn btn-outline">Cancelar</a>
+                <button type="submit" class="btn btn-primary">Reactivar Socio</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

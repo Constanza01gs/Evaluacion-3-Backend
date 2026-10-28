@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card" style="max-width:650px"><h2>Anular pago</h2>
+<p>{{ pago.membresia.socio.nombre_completo }} · ${{ pago.monto }} CLP · {{ pago.fecha_pago|date:'d/m/Y H:i' }}</p>
+<p>El registro se conservará, pero dejará de contar como ingreso. La membresía no se modifica automáticamente.</p>
+{% if pago.anulado %}<p>Este pago ya está anulado.</p>{% else %}
+<form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-primary" type="submit">Confirmar anulación</button></form>{% endif %}
+<p><a href="{% url 'gestion_list' 'pagos' %}">Volver a pagos</a></p></div>
+{% endblock %}

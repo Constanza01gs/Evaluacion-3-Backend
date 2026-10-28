@@ -1,0 +1,52 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Página no encontrada (404) - FitLife</title>
+    <link rel="stylesheet" href="{% static 'css/fitlife.css' %}">
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; box-sizing: border-box; }
+        .error-card { width: min(100%, 540px); box-sizing: border-box; box-shadow: 0 16px 36px rgba(0,0,0,.18); }
+        .error-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+        .error-actions a { display: inline-block; text-decoration: none; padding: 12px 20px; border-radius: 10px; font-weight: 700; }
+        .error-primary { background: #0f766e; color: white; }
+        .error-secondary { border: 1px solid #cbd5e1; color: #0f172a; }
+    </style>
+</head>
+<body style="background-color: #0B192C; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px;">
+    <div class="error-card" style="background-color: #FFFFFF; border-radius: 24px; padding: 50px 40px; text-align: center; border: 1px solid #e2e8f0;">
+        <!-- Icono de Montaña FitLife -->
+        <div style="display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 80px; background: linear-gradient(135deg, #00D2B4, #10B981); border-radius: 20px; margin-bottom: 24px;">
+            <svg width="44" height="44" viewBox="0 0 50 30" fill="none" stroke="#0B192C" stroke-width="2.5">
+                <path d="M5 25 L20 8 L30 18 L38 10 L45 25 Z"/>
+            </svg>
+        </div>
+
+        <h1 style="font-size: 3.5rem; font-weight: 900; color: #0B192C; line-height: 1; margin-bottom: 8px;">
+            404
+        </h1>
+        <h2 style="font-size: 1.4rem; font-weight: 800; color: #0F766E; margin-bottom: 16px;">
+            ¡Parece que tomaste una ruta fuera del circuito!
+        </h2>
+
+        <p style="font-size: 0.95rem; color: #64748B; line-height: 1.5; margin-bottom: 30px;">
+            La página, clase o recurso que estás buscando no existe o fue trasladado. En FitLife mantenemos la disciplina: regresa al panel principal para continuar entrenando o gestionando el gimnasio.
+        </p>
+
+        <div class="error-actions">
+            <a href="{% url 'dashboard_redirect' %}" class="error-primary">
+                Volver al Panel Principal →
+            </a>
+            <a href="{% url 'login' %}" class="error-secondary">
+                Iniciar Sesión
+            </a>
+        </div>
+
+        <div style="margin-top: 36px; padding-top: 20px; border-top: 1px solid #E2E8F0; font-size: 0.75rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">
+            FitLife &bull; Disciplina Hoy, Resultados Siempre
+        </div>
+    </div>
+</body>
+</html>

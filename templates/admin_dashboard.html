@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Panel de Control - Administrador FitLife{% endblock %}
+
+{% block content %}
+<div class="page-title-bar">
+    <div>
+        <h2>Panel de control</h2>
+        <div class="page-subtitle">Resumen general de la actividad de tu gimnasio</div>
+    </div>
+    <div class="date-pill">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Hoy, {{ hoy|date:"d \d\e F \d\e Y" }}
+    </div>
+</div>
+
+<!-- 4 Tarjetas de KPIs Principales -->
+<div class="kpi-grid">
+    <!-- 1. Socios Activos -->
+    <div class="kpi-card">
+        <div class="kpi-header">
+            <span class="kpi-label">Socios activos</span>
+            <div class="kpi-icon-box icon-blue">
+                <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value">{{ socios_activos }}</div>
+    </div>
+
+    <!-- 2. Membresías Activas -->
+    <div class="kpi-card">
+        <div class="kpi-header">
+            <span class="kpi-label">Membresías activas</span>
+            <div class="kpi-icon-box icon-gold">
+                <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value">{{ membresias_activas }}</div>
+    </div>
+
+    <!-- 3. Clases Hoy -->
+    <div class="kpi-card">
+        <div class="kpi-header">
+            <span class="kpi-label">Clases programadas hoy</span>
+            <div class="kpi-icon-box icon-teal">
+                <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value">{{ clases_hoy_count }}</div>
+        <div class="kpi-trend" style="color: var(--text-muted);">
+            {{ clases_hoy|length }} mostradas en el panel
+        </div>
+    </div>
+
+    <!-- 4. Ingresos Hoy -->
+    <div class="kpi-card">
+        <div class="kpi-header">
+            <span class="kpi-label">Ingresos del día</span>
+            <div class="kpi-icon-box icon-green">
+                <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value">${{ ingresos_hoy|floatformat:"0" }} CLP</div>
+    </div>
+</div>
+
+<!-- Grid de Paneles Secundarios -->
+<div class="dashboard-grid-2">
+    <!-- Columna Izquierda: Evolución y Clases de Hoy -->
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+        <!-- Aforo calculado con los movimientos registrados -->
+        <div class="card">
+            <div class="card-title-box">
+                <h3 class="card-title">Aforo del gimnasio</h3>
+                <span class="badge badge-info">Al cargar la página</span>
+            </div>
+            <p style="font-size:2rem;font-weight:700">{{ aforo.personas_dentro }} / {{ aforo.capacidad_maxima }}</p>
+            <p>Personas dentro · {{ aforo.porcentaje_ocupacion }}% de ocupación</p>
+            <a href="{% url 'control_acceso' %}" class="card-link">Ver control de acceso y aforo actualizado →</a>
+        </div>
+
+        <!-- Clases de hoy -->
+        <div class="card">
+            <div class="card-title-box">
+                <h3 class="card-title">Clases de hoy</h3>
+                <a href="{% url 'clases_list' %}" class="card-link">Ver todas las clases →</a>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+                {% for item in clases_hoy %}
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid #F1F5F9;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="font-family: monospace; font-size: 0.88rem; font-weight: 700; color: #64748B;">
+                                {{ item.clase.hora_inicio|time:"H:i" }}
+                            </span>
+                            <div>
+                                <div style="font-weight: 700; color: #1E293B;">{{ item.clase.nombre }}</div>
+                                <div style="font-size: 0.78rem; color: #64748B;">Prof. {{ item.clase.profesor.nombres }} {{ item.clase.profesor.apellidos }}</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 14px;">
+                            <div style="width: 100px; height: 8px; background-color: #E2E8F0; border-radius: 4px; overflow: hidden;">
+                                <div style="width: {{ item.porcentaje }}%; height: 100%; background-color: {% if item.porcentaje >= 100 %}#EF4444{% else %}#10B981{% endif %}; border-radius: 4px;"></div>
+                            </div>
+                            <span style="font-size: 0.82rem; font-weight: 700; color: #334155; min-width: 45px; text-align: right;">
+                                {{ item.confirmadas }}/{{ item.capacidad }}
+                            </span>
+                        </div>
+                    </div>
+                {% empty %}
+                    <p style="color: #64748B; font-size: 0.9rem;">No hay clases programadas para hoy.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Columna Derecha: Últimos Pagos y Donut de Membresías -->
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+        <!-- Últimos Pagos -->
+        <div class="card">
+            <div class="card-title-box">
+                <h3 class="card-title">Últimos pagos</h3>
+                <span class="badge badge-success">Pagos vigentes</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                {% for pago in ultimos_pagos %}
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.88rem;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div class="avatar-circle" style="width: 32px; height: 32px; font-size: 0.75rem; background-color: #0284C7;">
+                                {{ pago.membresia.socio.nombres|slice:":1" }}{{ pago.membresia.socio.apellidos|slice:":1" }}
+                            </div>
+                            <div>
+                                <div style="font-weight: 700; color: #1E293B;">{{ pago.membresia.socio.nombre_completo }}</div>
+                                <div style="font-size: 0.75rem; color: #64748B;">{{ pago.membresia.plan.nombre }}</div>
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: 800; color: #0F766E;">+${{ pago.monto|floatformat:"0" }} CLP</div>
+                            <div style="font-size: 0.72rem; color: #94A3B8;">{{ pago.fecha_pago|time:"H:i" }}</div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <p style="color: #64748B; font-size: 0.88rem;">No se han registrado pagos hoy.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Estado de Membresías (Donut breakdown) -->
+        <div class="card">
+            <div class="card-title-box">
+                <h3 class="card-title">Estado de membresías</h3>
+            </div>
+            <div style="text-align: center; margin-bottom: 16px;">
+                <div style="font-size: 2.2rem; font-weight: 800; color: #0B192C;">{{ membresias_activas }}</div>
+                <div style="font-size: 0.82rem; color: #64748B; text-transform: uppercase; font-weight: 600;">Suscripciones Vigentes</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                {% for plan in desglose_planes %}
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="legend-dot" style="background-color: {% cycle '#0284C7' '#10B981' '#F59E0B' '#8B5CF6' %};"></span>
+                            <span>{{ plan.nombre }}</span>
+                        </div>
+                        <span style="font-weight: 700; color: #1E293B;">{{ plan.total_activas }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

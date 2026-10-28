@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Simulador y Control de Acceso QR - FitLife{% endblock %}
+
+{% block content %}
+<div class="page-title-bar">
+    <div>
+        <h2>Control de Acceso mediante Código QR</h2>
+        <div class="page-subtitle">Simulador de torniquete inteligente, validación de membresías y control de movimientos</div>
+    </div>
+</div>
+
+<div class="reception-top-grid">
+    <!-- Panel del Simulador -->
+    <div class="card">
+        <div class="card-title-box">
+            <h3 class="card-title">Simulador de Lector QR de Acceso</h3>
+            <span class="badge badge-info">Simulación</span>
+        </div>
+
+        <p style="font-size: 0.88rem; color: #64748B; margin-bottom: 16px;">
+            Introduce el código QR o el RUT del socio para registrar un movimiento.
+        </p>
+
+        <!-- Formulario -->
+        <form id="form-simulador-qr" style="margin-bottom: 20px;">
+            <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+                <input type="text" id="qr-identificador-input" class="form-control" style="padding-left: 14px; font-size: 1rem; font-family: monospace;" placeholder="Ingresa Código QR (ej. FL-XXXXXXXX) o RUT..." required>
+                <button type="submit" class="btn btn-primary" style="white-space: nowrap; padding: 10px 24px;">
+                    Validar QR
+                </button>
+            </div>
+            <div style="display: flex; gap: 24px; font-size: 0.9rem; font-weight: 600;">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="radio" name="tipo_acceso" value="ENTRADA" checked style="accent-color: var(--primary);"> Registro de Entrada
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="radio" name="tipo_acceso" value="SALIDA" style="accent-color: #EF4444;"> Registro de Salida
+                </label>
+            </div>
+        </form>
+
+        <label for="socio-ejemplo" class="field-label">Elegir un socio para la simulación</label>
+        <select id="socio-ejemplo" class="form-control" onchange="document.getElementById('qr-identificador-input').value=this.value">
+            <option value="">Selecciona un socio (opcional)</option>
+            {% for socio in socios_ejemplo %}<option value="{{ socio.codigo_qr }}">{{ socio.nombre_completo }} · {{ socio.codigo_qr }}</option>{% endfor %}
+        </select>
+
+        <!-- Contenedor del resultado -->
+        <div id="qr-resultado-box" style="display: none;"></div>
+    </div>
+
+    <!-- Widget de Aforo y Explicación de Latencia -->
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+        <div class="card" id="aforo-widget">
+            <div class="card-title-box">
+                <h3 class="card-title">Aforo Actual</h3>
+                <span class="badge badge-info">Automático 5s</span>
+            </div>
+            <div class="aforo-container" style="padding: 10px 0;">
+                <div class="aforo-ring">
+                    <svg width="170" height="170" viewBox="0 0 170 170">
+                        <circle cx="85" cy="85" r="65" stroke="#E2E8F0" stroke-width="14" fill="none"/>
+                        <circle id="aforo-circle-progress" cx="85" cy="85" r="65" stroke="#10B981" stroke-width="14"
+                                stroke-linecap="round" fill="none"
+                                stroke-dasharray="408.4"
+                                stroke-dashoffset="155"
+                                transform="rotate(-90 85 85)"
+                                style="transition: stroke-dashoffset 0.8s ease;"/>
+                    </svg>
+                    <div class="aforo-center-text">
+                        <div class="aforo-num">
+                            <span id="aforo-personas">0</span>/<span id="aforo-maximo">200</span>
+                        </div>
+                        <div class="aforo-percent" id="aforo-porcentaje">0%</div>
+                    </div>
+                </div>
+                <div class="aforo-legend">
+                    <div class="legend-row">
+                        <span style="color: #64748B;">Capacidad disponible:</span>
+                        <strong id="aforo-disponibles">200</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Explicación Técnica de Latencia para la Defensa -->
+        <div class="card" style="background-color: #F8FAFC; border: 1px solid #E2E8F0;">
+            <h4 style="font-size: 0.92rem; font-weight: 700; color: #0B192C; margin-bottom: 8px;">
+                💡 Medición de Latencia en FitLife
+            </h4>
+            <p style="font-size: 0.82rem; color: #475569; line-height: 1.4;">
+                La cifra mostrada mide parte del procesamiento de la validación en el servidor. No incluye necesariamente el guardado del registro ni el tiempo de red; es una simulación, no una medición de un torniquete físico.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de Historial de Registros -->
+<div class="card" style="margin-top: 24px;">
+    <div class="card-title-box">
+        <h3 class="card-title">Historial de Accesos Recientes</h3>
+        <span class="badge badge-success">Últimos registros</span>
+    </div>
+    <div class="table-responsive">
+        <table class="fl-table">
+            <thead>
+                <tr>
+                    <th>Fecha y Hora</th>
+                    <th>Socio</th>
+                    <th>RUT</th>
+                    <th>Tipo</th>
+                    <th>Resultado</th>
+                    <th>Motivo / Explicación</th>
+                    <th>Latencia</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-ultimos-accesos-body">
+                {% for acc in ultimos_accesos %}
+                    <tr>
+                        <td style="font-family: monospace; font-size: 0.85rem;">{{ acc.fecha_hora|date:"d/m/Y H:i:s" }}</td>
+                        <td><strong>{{ acc.socio.nombre_completo }}</strong></td>
+                        <td style="font-family: monospace; font-size: 0.85rem;">{{ acc.socio.rut }}</td>
+                        <td>
+                            <span class="badge {% if acc.tipo == 'ENTRADA' %}badge-info{% else %}badge-warning{% endif %}">
+                                {{ acc.get_tipo_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge {% if acc.resultado == 'PERMITIDO' %}badge-success{% else %}badge-danger{% endif %}">
+                                {{ acc.get_resultado_display }}
+                            </span>
+                        </td>
+                        <td style="font-size: 0.85rem; color: #334155;">{{ acc.motivo }}</td>
+                        <td>
+                            <span style="font-family: monospace; font-size: 0.8rem; background: #F1F5F9; padding: 2px 6px; border-radius: 4px;">
+                                {{ acc.tiempo_respuesta_ms|floatformat:"1" }} ms
+                            </span>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: #94A3B8; padding: 30px;">
+                            No hay registros de accesos aún.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

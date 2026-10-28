@@ -1,0 +1,4 @@
+{% if objeto.activo %}
+  {% if es_admin or modulo == 'membresias' %}<a class="action-link" href="{% url 'gestion_editar' modulo objeto.id %}">Editar</a>{% endif %}
+  {% if es_admin %}<a class="action-link action-danger" href="{% url 'gestion_estado' modulo objeto.id 'desactivar' %}">Desactivar</a>{% endif %}
+{% elif es_admin %}<a class="action-link" href="{% url 'gestion_estado' modulo objeto.id 'restaurar' %}">Restaurar</a>{% endif %}

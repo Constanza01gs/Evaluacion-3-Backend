@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Directorio de Socios - FitLife{% endblock %}
+
+{% block content %}
+<div class="page-title-bar">
+    <div>
+        <h2>Socios de FitLife</h2>
+        <div class="page-subtitle">Listado de afiliados, códigos QR de acceso y estados de membresía</div>
+    </div>
+    <a href="{% url 'socio_nuevo' %}" class="btn btn-primary">+ Nuevo socio</a>
+</div>
+
+<div class="card">
+    <div class="card-title-box">
+        <h3 class="card-title">Listado de Socios Registrados</h3>
+        <span style="font-size: 0.85rem; color: #64748B;">Total: {{ socios.count }} socios</span>
+    </div>
+
+    <!-- Buscador interno -->
+    <form method="GET" action="{% url 'socios_list' %}" class="filter-bar">
+        <input type="text" name="q" class="form-control" style="max-width: 400px; padding-left: 14px;"
+               placeholder="Buscar por Nombre, RUT, Correo o Código QR..." value="{{ query|default:'' }}">
+        {% if es_admin %}<label class="visually-hidden" for="filtro-socios">Estado de socios</label><select id="filtro-socios" name="estado" class="filter-select"><option value="">Socios activos</option><option value="inactivos" {% if ver_inactivos %}selected{% endif %}>Socios desactivados</option></select>{% endif %}
+        <button type="submit" class="btn btn-primary">Buscar</button>
+        {% if query %}
+            <a href="{% url 'socios_list' %}" class="btn btn-outline">Limpiar</a>
+        {% endif %}
+    </form>
+
+    <div class="table-responsive">
+        <table class="fl-table">
+            <thead>
+                <tr>
+                    <th>RUT</th>
+                    <th>Socio</th>
+                    <th>Contacto</th>
+                    <th>Código QR / Token</th>
+                    <th>Membresía Actual</th>
+                    <th>Presencia</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for socio in socios %}
+                    <tr>
+                        <td class="nowrap" style="font-family: monospace; font-weight: 700;">{{ socio.rut }}</td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="avatar-circle" style="width: 34px; height: 34px; font-size: 0.8rem; background-color: #0F172A;">
+                                    {{ socio.iniciales }}
+                                </div>
+                                <div>
+                                    <strong style="color: #1E293B;">{{ socio.nombre_completo }}</strong>
+                                    <div style="font-size: 0.75rem; color: #64748B;">ID #{{ socio.id }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div style="font-size: 0.85rem;">{{ socio.email }}</div>
+                            <div style="font-size: 0.75rem; color: #64748B;">{{ socio.telefono }}</div>
+                        </td>
+                        <td>
+                            <span class="nowrap" style="background-color: #0B192C; color: #00D2B4; font-family: monospace; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.82rem; display:inline-block;">
+                                {{ socio.codigo_qr }}
+                            </span>
+                        </td>
+                        <td>
+                            {% with m=socio.membresia_vigente %}
+                                {% if m %}
+                                    <span class="badge badge-success">{{ m.plan.nombre }}</span>
+                                    <div style="font-size: 0.72rem; color: #065F46; margin-top: 2px;">Hasta {{ m.fecha_fin|date:"d/m/Y" }}</div>
+                                {% else %}
+                                    <span class="badge badge-danger">Sin membresía activa</span>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td>
+                            {% if socio.esta_dentro %}
+                                <span class="badge badge-info">● En el gimnasio</span>
+                            {% else %}
+                                <span style="font-size: 0.8rem; color: #94A3B8;">Fuera</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if socio.activo %}
+                                <span class="badge badge-success">Activo</span>
+                            {% else %}
+                                <span class="badge badge-danger">Baja Lógica</span>
+                            {% endif %}
+                        </td>
+                            <td>
+                                {% if socio.activo %}
+                                    <a href="{% url 'socio_editar' socio.id %}" class="btn btn-outline">Editar</a>
+                                    {% if es_admin %}
+                                    <a href="{% url 'socio_eliminar_logico' socio.id %}" class="btn btn-outline" style="padding: 4px 10px; font-size: 0.75rem; color: #DC2626; border-color: #FECACA;">
+                                        Desactivar
+                                    </a>
+                                    {% endif %}
+                                {% elif es_admin %}
+                                    <a href="{% url 'socio_restaurar_logico' socio.id %}" class="btn btn-outline" style="padding: 4px 10px; font-size: 0.75rem; color: #059669; border-color: #A7F3D0;">
+                                        Restaurar
+                                    </a>
+                                {% endif %}
+                            </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 30px; color: #64748B;">
+                            No se encontraron socios que coincidan con la búsqueda.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
