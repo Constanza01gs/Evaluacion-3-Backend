@@ -11,9 +11,11 @@
 
 ## 🌐 Despliegue en AWS Cloud (EC2)
 
-* **Instancia AWS EC2:** En proceso de configuración.
-* **IP Pública / DNS Funcional:** `http://[IP_PUBLICA_AWS_AQUI]:8000/` *(Se agregará la dirección definitiva tras el despliegue asistido en AWS Academy)*.
-* **Acceso Django Admin:** `http://[IP_PUBLICA_AWS_AQUI]:8000/admin/`
+* **Instancia:** AWS EC2 con Ubuntu Server y PostgreSQL.
+* **Aplicación:** https://18.233.27.215/
+* **Django Admin:** https://18.233.27.215/admin/
+* **Servidor:** Gunicorn y Nginx.
+* **Conexión segura:** HTTPS con certificado de Let's Encrypt y renovación programada.
 
 ---
 
@@ -36,7 +38,7 @@ FitLife resuelve esta problemática mediante:
 * **Vista Lógica:** Capa de datos relacional con Django ORM (`Socio`, `Plan`, `Membresia`, `Pago`, `Profesor`, `Clase`, `Reserva`, `RegistroAcceso`) y capa de servicios desacoplada (`gestion/services.py`).
 * **Vista de Procesos:** Concurrencia controlada con transacciones atómicas (`select_for_update()`) para evitar sobreventa de cupos en reservas simultáneas.
 * **Vista de Desarrollo:** Estructura modular Django con separación en apps, serializers REST, templates HTML responsivos y archivos estáticos desacoplados.
-* **Vista Física:** Despliegue previsto en una instancia AWS EC2 con PostgreSQL en la misma instancia; pendiente de verificación.
+* **Vista Física:** Aplicación desplegada en una instancia AWS EC2 con Ubuntu, PostgreSQL, Gunicorn y Nginx.
 
 ---
 
@@ -143,8 +145,7 @@ python manage.py test gestion
 - El repositorio debe contener el código fuente, migraciones, `.env.example`, este README y `prompts_ia.md`. No incluir `.env`, contraseñas ni `venv/`.
 - El ZIP utilizado en desarrollo contenía `.env` y `venv/`; no subir ese ZIP tal como está a un repositorio público. Revisar también los archivos ya rastreados por Git.
 - Cambiar las contraseñas de cuentas de demostración creadas por versiones anteriores. No documentar las nuevas contraseñas en el repositorio.
-- AWS requiere `DEBUG=False`, una clave secreta nueva y privada, hosts permitidos y configuración segura; faltan los pasos concretos de instalación, servicio de aplicación y archivos estáticos en EC2.
-- Actualizar este README con la IP o DNS real después de comprobar que la aplicación funciona públicamente. El despliegue sigue pendiente.
+- El despliegue en AWS utiliza `DEBUG=False`, una clave secreta privada, hosts permitidos y HTTPS. Las credenciales se mantienen fuera del repositorio.
 
 ## 📁 Estructura del Proyecto
 
