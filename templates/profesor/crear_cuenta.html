@@ -1,0 +1,2 @@
+{% extends 'gestion/_base_gym.html' %}{% block content %}
+<h2>Crear acceso para {{ profesor.nombres }} {{ profesor.apellidos }}</h2><div class="panel gym-card gym-form"><p>Se generará un código válido por 24 horas. Entrégalo de forma privada; el profesor elegirá su contraseña.</p><form method="post" data-gym-validation>{% csrf_token %}{{ form.as_p }}<button class="button primary" type="submit">Crear acceso</button></form><a href="{% url 'gestion_list' 'profesores' %}">Cancelar</a></div>{% endblock %}

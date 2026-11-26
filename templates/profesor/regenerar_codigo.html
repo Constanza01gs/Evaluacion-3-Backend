@@ -1,0 +1,2 @@
+{% extends 'gestion/_base_gym.html' %}{% block content %}
+<h2>Generar nuevo código</h2><div class="panel gym-card gym-form"><p>Confirma la identidad de {{ profesor.nombres }} {{ profesor.apellidos }} antes de entregarle el código de forma privada.</p><p>El código anterior dejará de funcionar y el nuevo será válido durante 24 horas.</p><form method="post" data-gym-validation>{% csrf_token %}<button class="button primary" type="submit">Generar código</button> <a href="{% url 'gestion_list' 'profesores' %}">Cancelar</a></form></div>{% endblock %}

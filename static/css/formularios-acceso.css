@@ -1,0 +1,14 @@
+.access-card{margin:1rem auto}.access-card .login-heading h1{font-size:1.9rem}.access-fields input,.access-fields select{width:100%;min-height:49px;border:1px solid #646d65;border-radius:8px;background:#111412;color:#fff;font:inherit;padding:0 1rem}.access-fields input:focus,.access-fields select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.access-fields small{display:block;color:var(--muted);margin-top:.35rem}.required-mark{color:var(--accent)}.security-question{color:var(--text)!important;font-weight:700}.access-help,.access-return{color:var(--muted);text-align:center;font-size:.9rem;line-height:1.5}.access-help a,.access-return a{color:var(--accent)}.access-help{margin-top:1.4rem}.access-return{margin:1.4rem 0 0}.errorlist{list-style:none;margin:0;padding:0}.access-card .field-error{display:block}@media(max-width:550px){.access-card{margin:0 auto}.access-card .login-heading h1{font-size:1.65rem}}
+.access-fields [aria-invalid="true"]{border-color:#ed7777;box-shadow:0 0 0 1px #ed7777}
+/* Registro: dos columnas en pantallas amplias, una en teléfonos. */
+.access-card--registro{width:min(100%,720px)}
+.access-card--registro .access-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:1.2rem}
+.access-card--registro .field-pregunta,.access-card--registro .field-respuesta{grid-column:1/-1}
+@media(max-width:600px){.access-card--registro .access-fields{grid-template-columns:1fr}.access-card--registro .field-pregunta,.access-card--registro .field-respuesta{grid-column:auto}}
+/* Mantener el error rojo incluso si el campo está seleccionado. */
+.access-fields input[aria-invalid="true"],
+.access-fields select[aria-invalid="true"],
+.access-fields textarea[aria-invalid="true"],
+.access-fields input[aria-invalid="true"]:focus,
+.access-fields select[aria-invalid="true"]:focus,
+.access-fields textarea[aria-invalid="true"]:focus{border-color:#ed7777;box-shadow:0 0 0 1px #ed7777;outline:none}

@@ -1,0 +1,11 @@
+{% extends 'profesor/_base_portal.html' %}
+{% block title %}Revisar asistencia{% endblock %}
+{% block content %}
+<header class="teacher-heading teacher-subpage teacher-detail-heading"><p>ESPACIO DEL PROFESOR</p><h1>Revisar y cerrar asistencia</h1><div class="teacher-heading-meta"><span>Comprueba la lista antes de confirmar el cierre.</span><a class="teacher-back" href="{% url 'profesor_detalle_clase' clase.id %}">← Volver a la clase</a></div></header>
+<section class="panel teacher-form-panel">
+  <div class="teacher-class-summary"><div><span class="teacher-eyebrow">CLASE</span><h2>{{ clase.nombre }}</h2><p>{{ clase.fecha|date:'d/m/Y' }} · {{ clase.hora_inicio|time:'H:i' }} – {{ clase.hora_fin|time:'H:i' }} hrs · {% if clase.sala_asignada %}{{ clase.sala_asignada.nombre }}{% else %}{{ clase.sala }}{% endif %}</p></div></div>
+  <div class="teacher-notice" role="note">Al cerrar la lista, los socios pendientes quedarán como «No asistió». Revisa las marcas antes de confirmar. La asistencia se puede cerrar al terminar la clase.</div>
+  <h2 class="teacher-section-title">Asistencia de los socios</h2>
+  <div class="teacher-table-wrap"><table class="teacher-table"><thead><tr><th scope="col">Socio</th><th scope="col">Asistencia</th></tr></thead><tbody>{% for reserva in reservas %}<tr><td data-label="Socio"><strong>{{ reserva.socio.nombre_completo }}</strong></td><td data-label="Asistencia"><span class="teacher-status {% if reserva.asistencia == 'ASISTIO' %}attended{% endif %}">{{ reserva.get_asistencia_display }}</span></td></tr>{% empty %}<tr><td colspan="2" class="teacher-empty-row">No hay reservas confirmadas.</td></tr>{% endfor %}</tbody></table></div>
+  {% if clase.asistencia_cerrada_en %}<p class="teacher-notice">Esta lista ya está cerrada.</p>{% else %}<div class="teacher-form-actions"><a class="button outline" href="{% url 'profesor_detalle_clase' clase.id %}">Volver y revisar</a><form method="post">{% csrf_token %}<button class="button primary" type="submit" name="confirmar" value="si">Confirmar cierre de asistencia</button></form></div>{% endif %}
+</section>{% endblock %}

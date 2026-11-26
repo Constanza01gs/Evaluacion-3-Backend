@@ -1,52 +1,39 @@
-{% load static %}
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Página no encontrada (404) - FitLife</title>
-    <link rel="stylesheet" href="{% static 'css/fitlife.css' %}">
-    <style>
-        body { font-family: system-ui, sans-serif; margin: 0; box-sizing: border-box; }
-        .error-card { width: min(100%, 540px); box-sizing: border-box; box-shadow: 0 16px 36px rgba(0,0,0,.18); }
-        .error-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-        .error-actions a { display: inline-block; text-decoration: none; padding: 12px 20px; border-radius: 10px; font-weight: 700; }
-        .error-primary { background: #0f766e; color: white; }
-        .error-secondary { border: 1px solid #cbd5e1; color: #0f172a; }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Página no encontrada | FitLife</title>
+  <style>
+    *{box-sizing:border-box}
+    body{min-height:100vh;margin:0;color:#f4f6f1;font:16px/1.5 Arial,Helvetica,sans-serif;background:linear-gradient(90deg,rgba(6,8,7,.96),rgba(6,8,7,.79)),url("{% static 'img/fitlife-portada.png' %}") center/cover fixed no-repeat #090b0a}
+    .error-page{min-height:100vh;display:flex;flex-direction:column;max-width:1400px;margin:auto;padding:2rem 4%}
+    .brand{display:inline-flex;align-items:center;gap:.7rem;width:max-content;color:#f4f6f1;text-decoration:none;font-size:1.35rem;font-weight:900;letter-spacing:.16em}
+    .brand-mark{display:grid;place-items:center;width:2.2rem;height:2.2rem;background:#c5fa00;color:#111;clip-path:polygon(20% 0,100% 0,80% 100%,0 100%);font-style:italic;letter-spacing:0}
+    main{flex:1;display:grid;place-items:center;padding:3rem 0 5rem}
+    .error-card{width:min(100%,610px);padding:3.5rem 3rem;text-align:center;background:#141715;border:1px solid #39413b;border-radius:16px;box-shadow:0 20px 55px #0006}
+    .eyebrow{margin:0 0 .6rem;color:#c5fa00;font-size:.75rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
+    .error-code{margin:0;color:#c5fa00;font-size:clamp(5rem,13vw,8rem);font-weight:900;letter-spacing:-.06em;line-height:1}
+    h1{margin:1.25rem 0 .8rem;font-size:clamp(1.55rem,3vw,2rem);line-height:1.2}
+    .description{max-width:430px;margin:0 auto;color:#b5bdb6;line-height:1.65}
+    .home-link{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;margin-top:2rem;padding:.85rem 1.35rem;border:1px solid #c5fa00;border-radius:9px;background:#c5fa00;color:#10130b;font-weight:700;text-decoration:none}
+    .home-link:hover{background:#ddff67;border-color:#ddff67}
+    a:focus-visible{outline:2px solid #c5fa00;outline-offset:4px}
+    @media(max-width:600px){.error-page{padding:1.3rem 5%}.brand{font-size:1.1rem}main{padding:2rem 0 4rem}.error-card{padding:2.6rem 1.4rem}.description{font-size:.95rem}}
+  </style>
 </head>
-<body style="background-color: #0B192C; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px;">
-    <div class="error-card" style="background-color: #FFFFFF; border-radius: 24px; padding: 50px 40px; text-align: center; border: 1px solid #e2e8f0;">
-        <!-- Icono de Montaña FitLife -->
-        <div style="display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 80px; background: linear-gradient(135deg, #00D2B4, #10B981); border-radius: 20px; margin-bottom: 24px;">
-            <svg width="44" height="44" viewBox="0 0 50 30" fill="none" stroke="#0B192C" stroke-width="2.5">
-                <path d="M5 25 L20 8 L30 18 L38 10 L45 25 Z"/>
-            </svg>
-        </div>
-
-        <h1 style="font-size: 3.5rem; font-weight: 900; color: #0B192C; line-height: 1; margin-bottom: 8px;">
-            404
-        </h1>
-        <h2 style="font-size: 1.4rem; font-weight: 800; color: #0F766E; margin-bottom: 16px;">
-            ¡Parece que tomaste una ruta fuera del circuito!
-        </h2>
-
-        <p style="font-size: 0.95rem; color: #64748B; line-height: 1.5; margin-bottom: 30px;">
-            La página, clase o recurso que estás buscando no existe o fue trasladado. En FitLife mantenemos la disciplina: regresa al panel principal para continuar entrenando o gestionando el gimnasio.
-        </p>
-
-        <div class="error-actions">
-            <a href="{% url 'dashboard_redirect' %}" class="error-primary">
-                Volver al Panel Principal →
-            </a>
-            <a href="{% url 'login' %}" class="error-secondary">
-                Iniciar Sesión
-            </a>
-        </div>
-
-        <div style="margin-top: 36px; padding-top: 20px; border-top: 1px solid #E2E8F0; font-size: 0.75rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">
-            FitLife &bull; Disciplina Hoy, Resultados Siempre
-        </div>
-    </div>
+<body>
+  <div class="error-page">
+    <a class="brand" href="{% url 'raiz' %}" aria-label="FitLife, ir al inicio"><span class="brand-mark" aria-hidden="true">F</span><span>FITLIFE</span></a>
+    <main>
+      <section class="error-card" aria-labelledby="error-title">
+        <p class="eyebrow">Página no encontrada</p>
+        <p class="error-code" aria-hidden="true">404</p>
+        <h1 id="error-title">Parece que tomaste una ruta fuera del circuito</h1>
+        <p class="description">La página que buscas no existe o fue trasladada. Vuelve al inicio para seguir explorando FitLife.</p>
+        <a class="home-link" href="{% url 'raiz' %}">← Volver al inicio</a>
+      </section>
+    </main>
+  </div>
 </body>
 </html>

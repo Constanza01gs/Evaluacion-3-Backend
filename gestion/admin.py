@@ -12,7 +12,7 @@ from django.utils.html import format_html
 from django.utils import timezone
 from .models import (
     Socio, Plan, Membresia, Pago,
-    Profesor, Clase, Reserva, RegistroAcceso
+    Profesor, Clase, Reserva, RegistroAcceso, Sala, Actividad
 )
 from .forms import ClaseForm
 
@@ -429,3 +429,22 @@ class RegistroAccesoAdmin(admin.ModelAdmin):
             '<span style="font-family: monospace; font-size: 0.85rem; color: #4b5563;">{:.1f} ms</span>',
             obj.tiempo_respuesta_ms
         )
+
+
+@admin.register(Sala)
+class SalaAdmin(HistorialProtegidoAdmin):
+    list_display = ('nombre', 'capacidad', 'activo')
+    search_fields = ('nombre',)
+
+    def get_queryset(self, request):
+        return Sala.all_objects.all()
+
+
+@admin.register(Actividad)
+class ActividadAdmin(HistorialProtegidoAdmin):
+    list_display = ('nombre', 'tipo', 'visible_sin_horario', 'activo')
+    list_filter = ('tipo', 'activo')
+    search_fields = ('nombre',)
+
+    def get_queryset(self, request):
+        return Actividad.all_objects.all()

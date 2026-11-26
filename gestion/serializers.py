@@ -25,8 +25,17 @@ class SocioSerializer(serializers.ModelSerializer):
 class PlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = Plan
-        fields = ['id', 'nombre', 'descripcion', 'duracion_dias', 'precio', 'permite_clases', 'activo']
+        fields = ['id', 'nombre', 'descripcion', 'duracion_dias', 'precio', 'permite_clases', 'limite_clases', 'activo']
         read_only_fields = ['activo']
+
+    def validate(self, attrs):
+        permite = attrs.get('permite_clases', getattr(self.instance, 'permite_clases', True))
+        limite = attrs.get('limite_clases', getattr(self.instance, 'limite_clases', None))
+        if limite is not None and limite < 1:
+            raise serializers.ValidationError({'limite_clases': 'El límite debe ser mayor que cero.'})
+        if not permite and limite is not None:
+            raise serializers.ValidationError({'limite_clases': 'Un plan sin clases no debe tener un límite de clases.'})
+        return attrs
 
 
 class MembresiaSerializer(serializers.ModelSerializer):
@@ -87,13 +96,17 @@ class ClaseSerializer(serializers.ModelSerializer):
     cupos_libres = serializers.IntegerField(source='cupos_disponibles', read_only=True)
     en_espera = serializers.IntegerField(source='total_en_espera', read_only=True)
     duracion_min = serializers.ReadOnlyField(source='duracion_minutos')
+    sala = serializers.SerializerMethodField()
+
+    def get_sala(self, obj):
+        return obj.sala_asignada.nombre if obj.sala_asignada_id else obj.sala
 
     class Meta:
         model = Clase
         fields = [
-            'id', 'nombre', 'profesor', 'profesor_nombre', 'fecha',
+            'id', 'nombre', 'actividad', 'profesor', 'profesor_nombre', 'fecha',
             'hora_inicio', 'hora_fin', 'duracion_min', 'capacidad_maxima',
-            'cupos_ocupados', 'cupos_libres', 'en_espera', 'sala', 'activo'
+            'cupos_ocupados', 'cupos_libres', 'en_espera', 'sala', 'sala_asignada', 'activo'
         ]
 
 
@@ -126,6 +139,6 @@ class RegistroAccesoSerializer(serializers.ModelSerializer):
 
 class ValidarAccesoQRSerializer(serializers.Serializer):
     """Valida los datos recibidos desde el simulador de lector QR."""
-    identificador = serializers.CharField(required=True, help_text="Código QR, RUT o ID del socio")
+    identificador = serializers.CharField(required=True, help_text="Código personal de acceso del socio")
     tipo = serializers.ChoiceField(choices=['ENTRADA', 'SALIDA'], default='ENTRADA')
     metodo = serializers.CharField(default='SIMULACION_QR')

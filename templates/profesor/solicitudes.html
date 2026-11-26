@@ -1,0 +1,48 @@
+{% extends 'profesor/_base_portal.html' %}
+{% block title %}Mis solicitudes{% endblock %}
+{% block content %}
+<header class="teacher-heading"><p>ESPACIO DEL PROFESOR</p><h1>Mis solicitudes</h1><span>Consulta el estado de tus correcciones de asistencia y avisos de indisponibilidad.</span></header>
+<nav class="teacher-tabs teacher-request-tabs" aria-label="Filtrar solicitudes por tipo">
+  <a href="?tipo=todas" {% if filtro == 'todas' %}aria-current="page"{% endif %}>Todas</a>
+  <a href="?tipo=correcciones" {% if filtro == 'correcciones' %}aria-current="page"{% endif %}>Correcciones de asistencia</a>
+  <a href="?tipo=indisponibilidad" {% if filtro == 'indisponibilidad' %}aria-current="page"{% endif %}>Avisos de indisponibilidad</a>
+</nav>
+{% if filtro != 'indisponibilidad' %}
+<section aria-labelledby="titulo-correcciones">
+<h2 id="titulo-correcciones" class="teacher-section-title">Correcciones de asistencia</h2>
+<div class="teacher-requests">
+{% for solicitud in solicitudes %}
+<article class="panel teacher-request teacher-request-card">
+  <div class="teacher-request-state"><span class="teacher-request-caption">ESTADO</span><span class="teacher-request-status status-{{ solicitud.estado|lower }}">{{ solicitud.get_estado_display }}</span></div>
+  <div class="teacher-request-content">
+    <div class="teacher-request-grid">
+      <div class="teacher-request-item"><svg><use href="#calendar"/></svg><div><span>Clase</span><strong>{{ solicitud.reserva.clase.nombre }}</strong></div></div>
+      <div class="teacher-request-item"><svg><use href="#person"/></svg><div><span>Socio</span><strong>{{ solicitud.reserva.socio.nombre_completo }}</strong></div></div>
+      <div class="teacher-request-item"><svg><use href="#calendar"/></svg><div><span>Fecha de la clase</span><strong>{{ solicitud.reserva.clase.fecha|date:'d/m/Y' }}</strong></div></div>
+      <div class="teacher-request-item"><svg><use href="#teacher-clock"/></svg><div><span>Asistencia solicitada</span><strong>{{ solicitud.get_estado_solicitado_display }}</strong></div></div>
+    </div>
+    <div class="teacher-request-extra"><span><strong>Motivo:</strong> {{ solicitud.motivo }}</span><span>Solicitada el {{ solicitud.fecha_solicitud|date:'d/m/Y H:i' }}</span></div>
+    {% if solicitud.fecha_revision or solicitud.comentario_revision %}<div class="teacher-request-review"><strong>Revisada por administración</strong>{% if solicitud.fecha_revision %}<span>{{ solicitud.fecha_revision|date:'d/m/Y H:i' }}</span>{% endif %}{% if solicitud.comentario_revision %}<span><strong>Comentario:</strong> {{ solicitud.comentario_revision }}</span>{% endif %}</div>{% endif %}
+  </div>
+</article>
+{% empty %}<div class="panel teacher-request-empty"><strong>Aún no tienes solicitudes de corrección.</strong><p>Aquí podrás seguir el estado de las correcciones de asistencia que solicites.</p></div>{% endfor %}
+</div></section>{% endif %}
+{% if filtro != 'correcciones' %}
+<section aria-labelledby="titulo-avisos">
+<h2 id="titulo-avisos" class="teacher-section-title">Avisos de indisponibilidad</h2>
+<div class="teacher-requests">
+{% for aviso in avisos %}
+<article class="panel teacher-request teacher-request-card">
+  <div class="teacher-request-state"><span class="teacher-request-caption">ESTADO</span>{% if aviso.revisado_en %}<span class="teacher-request-status status-aprobada">Revisado</span>{% else %}<span class="teacher-request-status status-pendiente">Pendiente de revisión</span>{% endif %}</div>
+  <div class="teacher-request-content">
+    <div class="teacher-request-grid teacher-notice-grid">
+      <div class="teacher-request-item"><svg><use href="#calendar"/></svg><div><span>Clase</span><strong>{{ aviso.clase.nombre }}</strong></div></div>
+      <div class="teacher-request-item"><svg><use href="#calendar"/></svg><div><span>Fecha y hora de la clase</span><strong>{{ aviso.clase.fecha|date:'d/m/Y' }} · {{ aviso.clase.hora_inicio|time:'H:i' }}</strong></div></div>
+    </div>
+    <div class="teacher-request-extra"><span><strong>Motivo:</strong> {{ aviso.motivo }}</span><span>Enviado el {{ aviso.creado_en|date:'d/m/Y H:i' }}</span></div>
+    {% if aviso.revisado_en %}<div class="teacher-request-review"><strong>Revisado por administración</strong><span>{{ aviso.revisado_en|date:'d/m/Y H:i' }}</span>{% if aviso.resolucion %}<span><strong>Resolución:</strong> {{ aviso.resolucion }}</span>{% endif %}</div>{% endif %}
+  </div>
+</article>
+{% empty %}<div class="panel teacher-request-empty"><strong>Aún no tienes avisos de indisponibilidad.</strong><p>Aquí podrás consultar los avisos que envíes y su estado.</p></div>{% endfor %}
+</div></section>{% endif %}
+{% endblock %}

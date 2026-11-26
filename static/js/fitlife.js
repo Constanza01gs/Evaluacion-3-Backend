@@ -178,6 +178,42 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         `;
 
+        // Recepción pregunta al socio antes de confirmar cada asistencia.
+        for (const clase of (data.clases_proximas || [])) {
+            const seccion = document.createElement('div');
+            seccion.style.marginTop = '16px';
+            const pregunta = document.createElement('p');
+            pregunta.textContent = `¿Vienes a ${clase.nombre} a las ${clase.hora}?`;
+            const confirmar = document.createElement('button');
+            confirmar.type = 'button';
+            confirmar.className = 'btn btn-primary';
+            confirmar.textContent = 'Sí, confirmar asistencia';
+            const omitir = document.createElement('button');
+            omitir.type = 'button';
+            omitir.className = 'btn btn-outline';
+            omitir.textContent = 'No por ahora';
+            omitir.addEventListener('click', () => seccion.remove());
+            const respuesta = document.createElement('p');
+            respuesta.setAttribute('role', 'status');
+            confirmar.addEventListener('click', async () => {
+                confirmar.disabled = true;
+                try {
+                    const res = await fetch(`/api/reservas/${encodeURIComponent(clase.reserva_id)}/confirmar-asistencia/`, {
+                        method: 'POST', credentials: 'same-origin', headers: {'X-CSRFToken': getCSRFToken()}
+                    });
+                    const datos = await res.json();
+                    respuesta.textContent = datos.mensaje || 'No fue posible confirmar la asistencia.';
+                    if (res.ok && datos.exito) { confirmar.remove(); omitir.remove(); }
+                    else confirmar.disabled = false;
+                } catch (error) {
+                    respuesta.textContent = 'No fue posible conectar. Inténtalo nuevamente.';
+                    confirmar.disabled = false;
+                }
+            });
+            seccion.append(pregunta, confirmar, omitir, respuesta);
+            resultadoBox.appendChild(seccion);
+        }
+
         // Si existe tabla de últimos accesos en la vista, insertar la fila arriba
         const tablaAccesos = document.getElementById('tabla-ultimos-accesos-body');
         if (tablaAccesos && data.socio) {

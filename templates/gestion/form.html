@@ -5,4 +5,61 @@
 {% if form.non_field_errors %}<div role="alert">{{ form.non_field_errors }}</div>{% endif %}
 {% for field in form %}<div class="form-field {% if field.field.widget.input_type == 'checkbox' %}form-checkbox{% endif %}">{% if field.field.widget.input_type == 'checkbox' %}<div class="checkbox-row">{{ field }}<label for="{{ field.id_for_label }}">{{ field.label }}</label></div>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{{ field }}{% endif %}{% if field.help_text %}<small class="field-help">{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<div role="alert" class="field-error">{{ error }}</div>{% endfor %}</div>{% endfor %}
 <button class="btn btn-primary" type="submit">Guardar</button> {% if modulo == 'clases' %}<a class="btn btn-outline" href="{% url 'clases_list' %}">Cancelar</a>{% else %}<a class="btn btn-outline" href="{% url 'gestion_list' modulo %}">Cancelar</a>{% endif %}</form></div>
+{% if modulo == 'membresias' and not objeto %}
+<script>
+(() => {
+    const socio = document.getElementById('id_socio');
+    const plan = document.getElementById('id_plan');
+    const inicio = document.getElementById('id_fecha_inicio');
+    const fin = document.getElementById('id_fecha_fin');
+    const detalle = document.createElement('p');
+    detalle.className = 'field-help';
+    detalle.setAttribute('aria-live', 'polite');
+    plan.parentElement.appendChild(detalle);
+    function actualizar() {
+        const opcion = plan.selectedOptions[0];
+        const dias = Number(opcion?.dataset.duracion);
+        const precio = opcion?.dataset.precio;
+        detalle.textContent = dias && precio ? `Duración: ${dias} días · Precio actual: $${Number(precio).toLocaleString('es-CL')} CLP` : '';
+        if (!dias || !inicio.value) { fin.value = ''; return; }
+        const fecha = new Date(`${inicio.value}T00:00:00Z`);
+        if (Number.isNaN(fecha.getTime())) { fin.value = ''; return; }
+        fecha.setUTCDate(fecha.getUTCDate() + dias - 1);
+        fin.value = fecha.toISOString().slice(0, 10);
+    }
+    const avisoSocio = document.createElement('p');
+    avisoSocio.className = 'field-help';
+    avisoSocio.setAttribute('aria-live', 'polite');
+    socio.parentElement.appendChild(avisoSocio);
+    function seleccionarSocio() {
+        const opcion = socio.selectedOptions[0];
+        const propuesta = opcion?.dataset.inicioRenovacion;
+        avisoSocio.textContent = opcion?.dataset.aviso || '';
+        if (propuesta) inicio.value = propuesta;
+        else if (!socio.value || opcion?.dataset.aviso) inicio.value = '';
+        actualizar();
+    }
+    socio.addEventListener('change', seleccionarSocio);
+    plan.addEventListener('change', actualizar);
+    inicio.addEventListener('change', actualizar);
+    avisoSocio.textContent = socio.selectedOptions[0]?.dataset.aviso || '';
+    actualizar();
+})();
+</script>
+{% endif %}
+{% if modulo == 'pagos' and not objeto %}
+<script>
+(() => {
+    const membresia = document.getElementById('id_membresia');
+    const monto = document.getElementById('id_monto');
+    function actualizarMonto() {
+        const precio = membresia.selectedOptions[0]?.dataset.precio;
+        monto.readOnly = Boolean(precio);
+        monto.value = precio || '';
+    }
+    membresia.addEventListener('change', actualizarMonto);
+    if (!monto.value) actualizarMonto();
+})();
+</script>
+{% endif %}
 {% endblock %}

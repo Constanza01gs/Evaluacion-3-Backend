@@ -4,6 +4,7 @@ Incluye manejo de socios, planes, membresías, pagos, accesos por QR, clases y r
 """
 
 from django.db import models
+from django.conf import settings
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 import uuid
@@ -69,6 +70,12 @@ class Socio(SoftDeleteModel):
     """
     Representa a una persona afiliada al gimnasio FitLife.
     """
+    usuario = models.OneToOneField(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='perfil_socio', verbose_name='Cuenta del socio')
+    PREGUNTAS_SEGURIDAD = [('MASCOTA', '¿Cómo se llamaba tu primera mascota?'), ('CIUDAD', '¿En qué ciudad naciste?'), ('ESCUELA', '¿Cómo se llamaba tu primera escuela?')]
+    pregunta_seguridad = models.CharField(max_length=20, choices=PREGUNTAS_SEGURIDAD, blank=True)
+    respuesta_seguridad_hash = models.CharField(max_length=128, blank=True, editable=False)
+    recuperacion_intentos = models.PositiveSmallIntegerField(default=0)
+    recuperacion_bloqueada_hasta = models.DateTimeField(null=True, blank=True)
     rut = models.CharField(
         max_length=12,
         unique=True,
@@ -109,16 +116,24 @@ class Socio(SoftDeleteModel):
         primera_a = self.apellidos[0] if self.apellidos else ""
         return f"{primera_n}{primera_a}".upper()
 
-    def membresia_vigente(self):
-        """Retorna la membresía activa más reciente si existe."""
-        hoy = timezone.localdate()
+    def membresia_para_fecha(self, fecha):
+        """Busca la membresía activa que cubre la fecha solicitada."""
+        pausa = SolicitudCongelamiento.objects.filter(membresia_id=models.OuterRef('pk'), estado='APROBADA', fecha_inicio__lte=fecha, fecha_fin__gte=fecha).filter(models.Q(fecha_reactivacion__isnull=True) | models.Q(fecha_reactivacion__gt=fecha))
         return self.membresias.filter(
             activo=True,
-            plan__activo=True,
             estado='ACTIVA',
-            fecha_inicio__lte=hoy,
-            fecha_fin__gte=hoy
-        ).order_by('-fecha_fin').first()
+            fecha_inicio__lte=fecha,
+            fecha_fin__gte=fecha,
+        ).annotate(en_pausa=models.Exists(pausa)).filter(en_pausa=False).order_by('-fecha_inicio', '-id').first()
+
+    def membresia_vigente(self):
+        """Retorna la membresía que autoriza el día actual."""
+        return self.membresia_para_fecha(timezone.localdate())
+
+    def membresia_en_pausa(self):
+        hoy = timezone.localdate()
+        pausa = SolicitudCongelamiento.objects.filter(membresia_id=models.OuterRef('pk'), estado='APROBADA', fecha_inicio__lte=hoy, fecha_fin__gte=hoy).filter(models.Q(fecha_reactivacion__isnull=True) | models.Q(fecha_reactivacion__gt=hoy))
+        return self.membresias.filter(activo=True, fecha_inicio__lte=hoy, fecha_fin__gte=hoy).annotate(en_pausa=models.Exists(pausa)).filter(models.Q(estado='CONGELADA') | models.Q(estado='ACTIVA', en_pausa=True)).order_by('-fecha_inicio', '-id').first()
 
     def esta_dentro(self):
         """Determina si el socio se encuentra actualmente dentro del gimnasio."""
@@ -151,6 +166,22 @@ class Plan(SoftDeleteModel):
         verbose_name="Permite reservar clases",
         help_text="Indica si incluye acceso a clases grupales (Spinning, Yoga, etc.)."
     )
+
+    limite_clases = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name="Clases por período",
+        help_text="Si el plan incluye clases, deja vacío para clases ilimitadas; de lo contrario ingresa un número mayor que cero."
+    )
+    dias_congelamiento = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name="Días de congelamiento por período",
+        help_text="Máximo de días por membresía. Usa 0 si no permite congelamiento; vacío significa por definir."
+    )
+
+    def clean(self):
+        super().clean()
+        if self.limite_clases is not None and self.limite_clases < 1:
+            raise ValidationError({'limite_clases': 'El límite debe ser mayor que cero; déjalo vacío para clases ilimitadas.'})
+        if not self.permite_clases and self.limite_clases is not None:
+            raise ValidationError({'limite_clases': 'Un plan sin clases no debe tener un límite de clases.'})
 
     class Meta:
         verbose_name = "Plan"
@@ -186,6 +217,11 @@ class Membresia(SoftDeleteModel):
     )
     fecha_inicio = models.DateField(default=timezone.now, verbose_name="Fecha de inicio")
     fecha_fin = models.DateField(verbose_name="Fecha de término")
+    precio_contratado = models.DecimalField(max_digits=10, decimal_places=0, null=True, blank=True, editable=False, verbose_name="Precio contratado (CLP)")
+    clases_contratadas = models.BooleanField(null=True, blank=True, editable=False, verbose_name="Clases incluidas al contratar")
+    limite_clases_contratado = models.PositiveIntegerField(null=True, blank=True, editable=False, verbose_name="Límite de clases contratado")
+    limite_clases_registrado = models.BooleanField(default=False, editable=False, verbose_name="Condiciones de cupo registradas")
+    dias_congelamiento_contratados = models.PositiveIntegerField(null=True, blank=True, editable=False, verbose_name="Días de congelamiento contratados")
     estado = models.CharField(
         max_length=15,
         choices=ESTADO_CHOICES,
@@ -208,9 +244,52 @@ class Membresia(SoftDeleteModel):
     def __str__(self):
         return f"Membresía {self.plan.nombre} - {self.socio.nombre_completo} [{self.get_estado_display()}]"
 
+    def save(self, *args, **kwargs):
+        if self._state.adding and self.precio_contratado is None and self.plan_id:
+            self.precio_contratado = self.plan.precio
+        if self._state.adding and self.clases_contratadas is None and self.plan_id:
+            self.clases_contratadas = self.plan.permite_clases
+        if self._state.adding and self.plan_id and not self.limite_clases_registrado:
+            self.limite_clases_contratado = self.plan.limite_clases
+            self.limite_clases_registrado = True
+        if self._state.adding and self.plan_id:
+            self.dias_congelamiento_contratados = self.plan.dias_congelamiento
+        super().save(*args, **kwargs)
+
+    @property
+    def incluye_clases(self):
+        """En membresías antiguas se consulta el plan hasta revisar sus condiciones."""
+        if self.clases_contratadas is None:
+            return self.plan.permite_clases
+        return self.clases_contratadas
+
+    @property
+    def saldo_clases_display(self):
+        """Describe el saldo sin inventar condiciones de contratos antiguos."""
+        if not self.incluye_clases:
+            return 'No incluye clases'
+        if not self.limite_clases_registrado:
+            return 'Límite histórico por revisar'
+        if self.limite_clases_contratado is None:
+            return 'Ilimitadas'
+        from .services import saldo_disponible
+        return f'{saldo_disponible(self)} de {self.limite_clases_contratado} disponibles'
+
+    @property
+    def dias_congelamiento_disponibles(self):
+        """Saldo por contrato, incluyendo días ya reservados en pausas aprobadas."""
+        if self.dias_congelamiento_contratados is None:
+            return None
+        usados = sum(p.dias_comprometidos for p in self.solicitudes_congelamiento.all() if p.estado == 'APROBADA')
+        return max(self.dias_congelamiento_contratados - usados, 0)
+
     @property
     def estado_actual_display(self):
         """Estado visible calculado según la fecha, sin modificar el registro al consultarlo."""
+        if self.estado == 'ACTIVA' and self.solicitudes_congelamiento.filter(estado='APROBADA', fecha_inicio__lte=timezone.localdate(), fecha_fin__gte=timezone.localdate()).filter(models.Q(fecha_reactivacion__isnull=True) | models.Q(fecha_reactivacion__gt=timezone.localdate())).exists():
+            return 'Congelada'
+        if self.estado == 'ACTIVA' and self.fecha_inicio > timezone.localdate():
+            return 'Programada'
         if self.estado != 'CONGELADA' and self.fecha_fin < timezone.localdate():
             return 'Vencida'
         return self.get_estado_display()
@@ -221,7 +300,7 @@ class Membresia(SoftDeleteModel):
             raise ValidationError("La fecha de término no puede ser anterior a la fecha de inicio.")
         if self.pk:
             anterior = Membresia.all_objects.filter(pk=self.pk).first()
-            if anterior and self.pagos.exists() and (anterior.socio_id != self.socio_id or anterior.plan_id != self.plan_id):
+            if anterior and (self.pagos.exists() or anterior.precio_contratado is not None or anterior.clases_contratadas is not None) and (anterior.socio_id != self.socio_id or anterior.plan_id != self.plan_id):
                 raise ValidationError('No se puede cambiar el socio o el plan de una membresía con pagos registrados. Crea una nueva membresía para conservar el historial.')
             if anterior and (self.estado != 'ACTIVA' or (self.fecha_fin and self.fecha_fin < anterior.fecha_fin)):
                 reservas = Reserva.objects.filter(socio_id=anterior.socio_id, clase__fecha__gte=timezone.localdate(), estado__in=['CONFIRMADA', 'LISTA_ESPERA'])
@@ -250,14 +329,14 @@ class Membresia(SoftDeleteModel):
             return False, "La membresía ha sido dada de baja del sistema."
         if not self.socio.activo:
             return False, "El socio se encuentra desactivado en el sistema."
-        if not self.plan.activo:
-            return False, "El plan se encuentra desactivado."
         if self.estado == 'CONGELADA':
             return False, f"Membresía congelada temporalmente ({self.motivo_congelacion or 'Sin motivo detallado'})."
         if self.estado == 'VENCIDA':
             return False, f"Membresía vencida el {self.fecha_fin.strftime('%d/%m/%Y')}."
         if self.estado == 'ACTIVA':
             hoy = timezone.localdate()
+            if self.solicitudes_congelamiento.filter(estado='APROBADA', fecha_inicio__lte=hoy, fecha_fin__gte=hoy).filter(models.Q(fecha_reactivacion__isnull=True) | models.Q(fecha_reactivacion__gt=hoy)).exists():
+                return False, 'Membresía congelada temporalmente.'
             if self.fecha_inicio > hoy:
                 return False, f"La membresía inicia el {self.fecha_inicio.strftime('%d/%m/%Y')}."
             return True, "Acceso permitido. Membresía activa."
@@ -389,6 +468,8 @@ class Profesor(SoftDeleteModel):
     """
     Entrenadores e instructores a cargo de las clases grupales.
     """
+    usuario = models.OneToOneField(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='perfil_profesor', verbose_name='Cuenta de profesor')
+    rut = models.CharField(max_length=12, unique=True, null=True, blank=True, verbose_name='RUT')
     nombres = models.CharField(max_length=100, verbose_name="Nombres")
     apellidos = models.CharField(max_length=100, verbose_name="Apellidos")
     especialidad = models.CharField(
@@ -408,15 +489,78 @@ class Profesor(SoftDeleteModel):
         return f"{self.nombres} {self.apellidos} ({self.especialidad})"
 
 
+class Sala(SoftDeleteModel):
+    nombre = models.CharField(max_length=80, unique=True, verbose_name='Nombre')
+    capacidad = models.PositiveIntegerField(verbose_name='Capacidad')
+    descripcion = models.TextField(blank=True, verbose_name='Descripción y equipamiento')
+
+    class Meta:
+        ordering = ['nombre']
+        verbose_name = 'Sala'
+        verbose_name_plural = 'Salas'
+
+    def clean(self):
+        super().clean()
+        if self.capacidad is not None and self.capacidad < 1:
+            raise ValidationError({'capacidad': 'La capacidad debe ser al menos una persona.'})
+
+    def __str__(self):
+        return self.nombre
+
+
+class Actividad(SoftDeleteModel):
+    TIPOS = [('PERMANENTE', 'Permanente'), ('TEMPORADA', 'De temporada'), ('ESPECIAL', 'Especial')]
+    nombre = models.CharField(max_length=100, unique=True, verbose_name='Nombre')
+    descripcion = models.TextField(blank=True, verbose_name='Descripción')
+    tipo = models.CharField(max_length=12, choices=TIPOS, default='PERMANENTE', verbose_name='Tipo')
+    visible_sin_horario = models.BooleanField(default=False, verbose_name='Mostrar como próximamente si no tiene horarios')
+
+    class Meta:
+        ordering = ['nombre']
+        verbose_name = 'Actividad'
+        verbose_name_plural = 'Actividades'
+
+    def __str__(self):
+        return self.nombre
+
+
+class ProgramacionClase(models.Model):
+    nombre = models.CharField(max_length=100)
+    actividad = models.ForeignKey(Actividad, on_delete=models.PROTECT)
+    profesor = models.ForeignKey(Profesor, on_delete=models.PROTECT)
+    sala = models.ForeignKey(Sala, on_delete=models.PROTECT)
+    capacidad = models.PositiveIntegerField()
+    desde = models.DateField()
+    hasta = models.DateField(null=True, blank=True)
+    activa = models.BooleanField(default=True)
+    generado_hasta = models.DateField(null=True, blank=True)
+    aviso_conflicto = models.TextField(blank=True)
+
+
+class HorarioProgramacion(models.Model):
+    programacion = models.ForeignKey(ProgramacionClase, on_delete=models.PROTECT, related_name='horarios')
+    dia = models.PositiveSmallIntegerField()
+    inicio = models.TimeField()
+    fin = models.TimeField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['programacion', 'dia'], name='horario_unico_programacion_dia')]
+        ordering = ['dia']
+
+
 class Clase(SoftDeleteModel):
     """
     Sesión de clase grupal con horario, instructor y capacidad máxima.
     """
+    excepcion_programacion = models.BooleanField(default=False)
+    programacion = models.ForeignKey(ProgramacionClase, null=True, blank=True, on_delete=models.PROTECT, related_name='sesiones')
+    horario_programado = models.ForeignKey(HorarioProgramacion, null=True, blank=True, on_delete=models.PROTECT, related_name='sesiones')
     nombre = models.CharField(
         max_length=100,
         verbose_name="Nombre de la clase",
         help_text="Ej: Spinning Matutino, Yoga Restaurativo, Funcional Power"
     )
+    actividad = models.ForeignKey(Actividad, on_delete=models.PROTECT, null=True, blank=True, related_name='sesiones', verbose_name='Actividad')
     profesor = models.ForeignKey(
         Profesor,
         on_delete=models.PROTECT,
@@ -430,6 +574,9 @@ class Clase(SoftDeleteModel):
         default=20,
         verbose_name="Capacidad máxima (Cupos)"
     )
+    asistencia_cerrada_en = models.DateTimeField(null=True, blank=True, editable=False)
+    asistencia_cerrada_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='clases_asistencia_cerradas', editable=False)
+    sala_asignada = models.ForeignKey(Sala, on_delete=models.PROTECT, null=True, blank=True, related_name='clases', verbose_name='Sala')
     sala = models.CharField(
         max_length=50,
         default="Sala Principal",
@@ -440,6 +587,7 @@ class Clase(SoftDeleteModel):
         verbose_name = "Clase grupal"
         verbose_name_plural = "Clases grupales"
         ordering = ['fecha', 'hora_inicio']
+        constraints = [models.UniqueConstraint(fields=['horario_programado', 'fecha'], condition=models.Q(horario_programado__isnull=False), name='sesion_programada_unica_por_dia')]
 
     def __str__(self):
         return f"{self.nombre} - {self.fecha.strftime('%d/%m')} {self.hora_inicio.strftime('%H:%M')} ({self.profesor.nombres})"
@@ -477,6 +625,9 @@ class Reserva(models.Model):
     ESTADO_RESERVA = [
         ('CONFIRMADA', 'Confirmada'),
         ('LISTA_ESPERA', 'Lista de espera'),
+        ('CRUCE_HORARIO', 'No confirmada por cruce de horario'),
+        ('SIN_CUPO', 'Sin cupo'),
+        ('SIN_SALDO', 'No confirmada por falta de saldo'),
         ('CANCELADA', 'Cancelada'),
     ]
 
@@ -492,6 +643,12 @@ class Reserva(models.Model):
         related_name='reservas',
         verbose_name="Socio"
     )
+    membresia = models.ForeignKey(Membresia, null=True, blank=True, on_delete=models.PROTECT, related_name='reservas_asociadas')
+    consume_clase = models.BooleanField(default=False)
+    promocion_tardia = models.BooleanField(default=False)
+    asistencia = models.CharField(max_length=15, choices=[('PENDIENTE', 'Pendiente'), ('ASISTIO', 'Asistió'), ('NO_ASISTIO', 'No asistió')], default='PENDIENTE')
+    asistencia_registrada_por = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL, related_name='asistencias_registradas')
+    fecha_asistencia = models.DateTimeField(null=True, blank=True)
     estado = models.CharField(
         max_length=15,
         choices=ESTADO_RESERVA,
@@ -522,3 +679,204 @@ class Reserva(models.Model):
 
     def __str__(self):
         return f"Reserva #{self.id}: {self.socio.nombre_completo} -> {self.clase.nombre} [{self.get_estado_display()}]"
+
+
+class NotificacionSocio(models.Model):
+    """Aviso interno relacionado con una solicitud de clase."""
+    socio = models.ForeignKey(Socio, on_delete=models.PROTECT, related_name='notificaciones')
+    reserva = models.ForeignKey(Reserva, null=True, blank=True, on_delete=models.PROTECT, related_name='notificaciones')
+    tipo = models.CharField(max_length=30)
+    mensaje = models.TextField()
+    creada = models.DateTimeField(default=timezone.now)
+    leida = models.BooleanField(default=False)
+    oculta = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-creada', '-id']
+        constraints = [models.UniqueConstraint(fields=['reserva', 'tipo'], name='notificacion_unica_reserva_tipo')]
+
+
+class CambioCodigoAcceso(models.Model):
+    socio = models.ForeignKey(Socio, on_delete=models.PROTECT, related_name='cambios_codigo_acceso')
+    realizado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='cambios_codigo_realizados')
+    realizado_en = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-realizado_en', '-id']
+
+
+class ActivacionSocio(models.Model):
+    socio = models.OneToOneField(Socio, on_delete=models.PROTECT, related_name='activacion_cuenta')
+    codigo_hash = models.CharField(max_length=128)
+    vence_en = models.DateTimeField()
+    usado_en = models.DateTimeField(null=True, blank=True)
+    intentos_fallidos = models.PositiveSmallIntegerField(default=0)
+    bloqueado_hasta = models.DateTimeField(null=True, blank=True)
+    generado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='activaciones_socio_generadas')
+    generado_en = models.DateTimeField(default=timezone.now)
+
+
+class RecuperacionAsistidaSocio(models.Model):
+    socio = models.OneToOneField(Socio, on_delete=models.PROTECT, related_name='recuperacion_asistida')
+    codigo_hash = models.CharField(max_length=128)
+    vence_en = models.DateTimeField()
+    usado_en = models.DateTimeField(null=True, blank=True)
+    intentos_fallidos = models.PositiveSmallIntegerField(default=0)
+    bloqueado_hasta = models.DateTimeField(null=True, blank=True)
+    generado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='recuperaciones_socio_generadas')
+    generado_en = models.DateTimeField(default=timezone.now)
+
+
+class HistorialAsistencia(models.Model):
+    reserva = models.ForeignKey(Reserva, on_delete=models.PROTECT, related_name='historial_asistencia')
+    estado_anterior = models.CharField(max_length=15)
+    estado_nuevo = models.CharField(max_length=15)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    fecha = models.DateTimeField(default=timezone.now)
+    origen = models.CharField(max_length=15)
+
+    class Meta:
+        ordering = ['-fecha', '-id']
+
+
+class SolicitudCongelamiento(models.Model):
+    """Solicitud pendiente: no modifica la vigencia hasta que sea revisada."""
+    membresia = models.ForeignKey(Membresia, on_delete=models.PROTECT, related_name='solicitudes_congelamiento')
+    solicitante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='congelamientos_solicitados')
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    estado = models.CharField(max_length=12, choices=[('PENDIENTE', 'Pendiente'), ('CANCELADA', 'Cancelada'), ('RECHAZADA', 'Rechazada'), ('APROBADA', 'Aprobada')], default='PENDIENTE')
+    creada_en = models.DateTimeField(auto_now_add=True)
+    revisado_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='congelamientos_revisados')
+    revisada_en = models.DateTimeField(null=True, blank=True)
+    motivo = models.TextField(blank=True, max_length=500, verbose_name='Motivo de la solicitud')
+    motivo_rechazo = models.TextField(blank=True)
+    cancelada_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='congelamientos_cancelados')
+    cancelada_en = models.DateTimeField(null=True, blank=True)
+    renovacion_ajustada = models.ForeignKey(Membresia, null=True, blank=True, on_delete=models.PROTECT, related_name='ajustes_por_congelamiento')
+    renovacion_inicio_anterior = models.DateField(null=True, blank=True)
+    renovacion_fin_anterior = models.DateField(null=True, blank=True)
+    reactivacion_pendiente = models.BooleanField(default=False)
+    reactivacion_solicitada_en = models.DateTimeField(null=True, blank=True)
+    reactivacion_expirada_en = models.DateTimeField(null=True, blank=True)
+    reactivada_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='reactivaciones_aprobadas')
+    fecha_reactivacion = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-creada_en']
+        constraints = [
+            models.CheckConstraint(condition=models.Q(fecha_fin__gte=models.F('fecha_inicio')), name='congelamiento_fechas_ordenadas'),
+            models.UniqueConstraint(fields=['membresia'], condition=models.Q(estado='PENDIENTE'), name='una_solicitud_congelamiento_pendiente'),
+        ]
+
+    @property
+    def dias_solicitados(self):
+        return (self.fecha_fin - self.fecha_inicio).days + 1
+
+    @property
+    def dias_comprometidos(self):
+        if self.fecha_reactivacion:
+            return max(0, (self.fecha_reactivacion - self.fecha_inicio).days)
+        return self.dias_solicitados
+
+
+class SolicitudCorreccionAsistencia(models.Model):
+    reserva = models.ForeignKey(Reserva, on_delete=models.PROTECT, related_name='solicitudes_correccion')
+    solicitante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='correcciones_solicitadas')
+    estado_solicitado = models.CharField(max_length=15, choices=[('ASISTIO', 'Asistió'), ('NO_ASISTIO', 'No asistió')])
+    motivo = models.TextField()
+    estado = models.CharField(max_length=12, choices=[('PENDIENTE', 'Pendiente'), ('APROBADA', 'Aprobada'), ('RECHAZADA', 'Rechazada')], default='PENDIENTE')
+    fecha_solicitud = models.DateTimeField(default=timezone.now)
+    revisado_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='correcciones_revisadas')
+    fecha_revision = models.DateTimeField(null=True, blank=True)
+    comentario_revision = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-fecha_solicitud', '-id']
+        constraints = [models.UniqueConstraint(fields=['reserva'], condition=models.Q(estado='PENDIENTE'), name='una_correccion_pendiente_por_reserva')]
+
+
+class NotificacionProfesor(models.Model):
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='notificaciones_profesor')
+    solicitud = models.OneToOneField(SolicitudCorreccionAsistencia, null=True, blank=True, on_delete=models.PROTECT, related_name='notificacion_profesor')
+    clase = models.ForeignKey(Clase, null=True, blank=True, on_delete=models.PROTECT, related_name='notificaciones_profesor')
+    mensaje = models.TextField()
+    creada = models.DateTimeField(default=timezone.now)
+    leida = models.BooleanField(default=False)
+    oculta = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-creada', '-id']
+
+
+class NotificacionRecepcion(models.Model):
+    """Aviso compartido o dirigido a un usuario, con lectura independiente."""
+    destino = models.CharField(max_length=300, blank=True)
+    destinatario = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="avisos_personales_recepcion")
+    clase = models.ForeignKey(Clase, null=True, blank=True, on_delete=models.PROTECT, related_name='notificaciones_recepcion')
+    mensaje = models.TextField()
+    creada = models.DateTimeField(default=timezone.now)
+    leida_por = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='avisos_recepcion_leidos')
+    oculta_por = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='avisos_recepcion_ocultos')
+
+    class Meta:
+        ordering = ['-creada', '-id']
+
+
+class SolicitudAnulacionPago(models.Model):
+    pago = models.ForeignKey(Pago, on_delete=models.PROTECT, related_name='solicitudes_anulacion')
+    solicitante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='anulaciones_solicitadas')
+    origen = models.CharField(max_length=12, choices=[('SOCIO', 'Socio'), ('RECEPCION', 'Recepción')])
+    motivo = models.TextField(max_length=500)
+    estado = models.CharField(max_length=12, choices=[('PENDIENTE', 'Pendiente'), ('APROBADA', 'Aprobada'), ('RECHAZADA', 'Rechazada')], default='PENDIENTE')
+    creada = models.DateTimeField(default=timezone.now)
+    revisada = models.DateTimeField(null=True, blank=True)
+    revisado_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='anulaciones_revisadas')
+    comentario = models.TextField(blank=True, max_length=500)
+
+    class Meta:
+        ordering = ['-creada', '-id']
+        constraints = [models.UniqueConstraint(fields=['pago'], condition=models.Q(estado='PENDIENTE'), name='una_anulacion_pendiente_pago')]
+
+
+class ActivacionProfesor(models.Model):
+    profesor = models.OneToOneField(Profesor, on_delete=models.PROTECT, related_name='activacion_cuenta')
+    codigo_hash = models.CharField(max_length=128)
+    vence_en = models.DateTimeField()
+    usado_en = models.DateTimeField(null=True, blank=True)
+    intentos_fallidos = models.PositiveSmallIntegerField(default=0)
+    bloqueado_hasta = models.DateTimeField(null=True, blank=True)
+    creado_en = models.DateTimeField(default=timezone.now)
+
+
+class PerfilPersonal(models.Model):
+    usuario = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='perfil_personal')
+    rut = models.CharField(max_length=12, unique=True, verbose_name='RUT')
+    telefono = models.CharField(max_length=20, blank=True, verbose_name='Teléfono')
+    pregunta_seguridad = models.CharField(max_length=20, choices=Socio.PREGUNTAS_SEGURIDAD, blank=True)
+    respuesta_seguridad_hash = models.CharField(max_length=128, blank=True, editable=False)
+    recuperacion_intentos = models.PositiveSmallIntegerField(default=0)
+    recuperacion_bloqueada_hasta = models.DateTimeField(null=True, blank=True)
+
+
+class ActivacionRecepcion(models.Model):
+    usuario = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='activacion_recepcion')
+    codigo_hash = models.CharField(max_length=128)
+    vence_en = models.DateTimeField()
+    usado_en = models.DateTimeField(null=True, blank=True)
+    intentos_fallidos = models.PositiveSmallIntegerField(default=0)
+    bloqueado_hasta = models.DateTimeField(null=True, blank=True)
+
+
+class AvisoIndisponibilidad(models.Model):
+    clase = models.ForeignKey(Clase, on_delete=models.PROTECT, related_name='avisos_indisponibilidad')
+    profesor = models.ForeignKey(Profesor, on_delete=models.PROTECT, related_name='avisos_indisponibilidad')
+    motivo = models.TextField()
+    creado_en = models.DateTimeField(default=timezone.now)
+    revisado_en = models.DateTimeField(null=True, blank=True)
+    revisado_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='avisos_indisponibilidad_revisados')
+    resolucion = models.CharField(max_length=180, blank=True)
+
+    class Meta:
+        ordering = ['-creado_en', '-id']
+        constraints = [models.UniqueConstraint(fields=['clase', 'profesor'], condition=models.Q(revisado_en__isnull=True), name='aviso_indisponibilidad_pendiente_unico')]

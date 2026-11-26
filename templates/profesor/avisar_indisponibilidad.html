@@ -1,0 +1,10 @@
+{% extends 'profesor/_base_portal.html' %}
+{% block title %}Avisar indisponibilidad{% endblock %}
+{% block content %}
+<header class="teacher-heading teacher-subpage"><p>ESPACIO DEL PROFESOR</p><h1>Avisar indisponibilidad</h1><span>Informa a administración si no puedes realizar esta clase.</span></header>
+<a class="teacher-back" href="{% url 'profesor_detalle_clase' clase.id %}">← Volver a la clase</a>
+<section class="panel teacher-form-panel teacher-form-narrow">
+  <div class="teacher-class-summary"><div><span class="teacher-eyebrow">CLASE SELECCIONADA</span><h2>{{ clase.nombre }}</h2><p>{{ clase.fecha|date:'d/m/Y' }} · {{ clase.hora_inicio|time:'H:i' }} – {{ clase.hora_fin|time:'H:i' }} hrs · {% if clase.sala_asignada %}{{ clase.sala_asignada.nombre }}{% else %}{{ clase.sala }}{% endif %}</p></div></div>
+  <div class="teacher-notice" role="note">Envía el aviso con al menos 48 horas de anticipación. La clase seguirá programada hasta que administración tome una decisión. Ante una emergencia, contacta directamente al gimnasio.</div>
+  <form method="post" class="teacher-unavailable-form">{% csrf_token %}<label for="motivo">Motivo <span aria-hidden="true">*</span></label><p>Cuéntanos brevemente por qué no podrás asistir.</p><textarea id="motivo" name="motivo" maxlength="1000" rows="5" required placeholder="Escribe aquí el motivo de tu indisponibilidad"></textarea><small>Máximo 1000 caracteres.</small><div class="teacher-form-actions"><a class="button outline" href="{% url 'profesor_detalle_clase' clase.id %}">Cancelar</a><button class="button primary" type="submit">Enviar aviso</button></div></form>
+</section>{% endblock %}

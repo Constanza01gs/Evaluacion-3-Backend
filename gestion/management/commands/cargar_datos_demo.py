@@ -15,7 +15,7 @@ from decimal import Decimal
 
 from gestion.models import (
     Socio, Plan, Membresia, Pago, Profesor,
-    Clase, Reserva, RegistroAcceso
+    Clase, Reserva, RegistroAcceso, Sala, Actividad
 )
 
 
@@ -24,7 +24,7 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
-        modelos = (Socio, Plan, Membresia, Pago, Profesor, Clase, Reserva, RegistroAcceso)
+        modelos = (Socio, Plan, Membresia, Pago, Profesor, Clase, Reserva, RegistroAcceso, Sala, Actividad)
         if any((m.all_objects if hasattr(m, 'all_objects') else m.objects).exists() for m in modelos):
             raise CommandError('La carga de demostración solo se ejecuta en una base sin datos de FitLife. No se modificó ningún dato.')
         self.stdout.write(self.style.NOTICE("Iniciando preparación y carga de datos para FitLife..."))
@@ -59,27 +59,35 @@ class Command(BaseCommand):
                 'duracion_dias': 30,
                 'precio': Decimal('25000'),
                 'permite_clases': False,
+                'limite_clases': None,
+                'dias_congelamiento': 5,
             },
             {
                 'nombre': 'Plan Plus',
-                'descripcion': 'Acceso completo a salas y todas las clases grupales.',
+                'descripcion': 'Acceso a áreas generales y hasta 8 clases grupales por membresía.',
                 'duracion_dias': 30,
-                'precio': Decimal('40000'),
+                'precio': Decimal('35000'),
                 'permite_clases': True,
+                'limite_clases': 8,
+                'dias_congelamiento': 7,
             },
             {
-                'nombre': 'Plan Premium Trimestral',
-                'descripcion': 'Plan trimestral con acceso total y evaluación nutricional.',
+                'nombre': 'Plan Premium',
+                'descripcion': 'Acceso a áreas generales y clases grupales ilimitadas, sujetas a cupos.',
+                'duracion_dias': 30,
+                'precio': Decimal('45000'),
+                'permite_clases': True,
+                'limite_clases': None,
+                'dias_congelamiento': 10,
+            },
+            {
+                'nombre': 'Plan Plus Trimestral',
+                'descripcion': 'Acceso a áreas generales y hasta 24 clases durante 90 días.',
                 'duracion_dias': 90,
-                'precio': Decimal('105000'),
+                'precio': Decimal('99000'),
                 'permite_clases': True,
-            },
-            {
-                'nombre': 'Plan Élite Anual',
-                'descripcion': 'Membresía anual completa con estacionamiento y casillero exclusivo.',
-                'duracion_dias': 365,
-                'precio': Decimal('360000'),
-                'permite_clases': True,
+                'limite_clases': 24,
+                'dias_congelamiento': 15,
             },
         ]
 
@@ -104,10 +112,11 @@ class Command(BaseCommand):
         ]
 
         profesores_dict = {}
-        for prof in profesores_datos:
+        ruts_profesores = ['20100000-9', '20100001-7', '20100002-5', '20100003-3', '20100004-1']
+        for prof, rut in zip(profesores_datos, ruts_profesores):
             p_obj, _ = Profesor.objects.get_or_create(
                 email=prof['email'],
-                defaults=prof
+                defaults={**prof, 'rut': rut}
             )
             profesores_dict[prof['nombres']] = p_obj
 
@@ -120,21 +129,21 @@ class Command(BaseCommand):
         socios_datos = [
             # Socios con Membresía ACTIVA (Casos para estar adentro o entrar)
             {'rut': '18.452.123-4', 'nombres': 'Camila', 'apellidos': 'Rojas Herrera', 'email': 'camila.rojas@ejemplo.cl', 'telefono': '+56991234567', 'qr': 'FL-CAMI1042', 'plan': 'Plan Plus', 'estado_m': 'ACTIVA', 'dias_fin': 25},
-            {'rut': '19.876.543-2', 'nombres': 'Matías', 'apellidos': 'Fuentes Alarcón', 'email': 'matias.fuentes@ejemplo.cl', 'telefono': '+56992345678', 'qr': 'FL-MATI2051', 'plan': 'Plan Premium Trimestral', 'estado_m': 'ACTIVA', 'dias_fin': 60},
+            {'rut': '19.876.543-2', 'nombres': 'Matías', 'apellidos': 'Fuentes Alarcón', 'email': 'matias.fuentes@ejemplo.cl', 'telefono': '+56992345678', 'qr': 'FL-MATI2051', 'plan': 'Plan Plus Trimestral', 'estado_m': 'ACTIVA', 'dias_fin': 60},
             {'rut': '17.345.987-1', 'nombres': 'Sofía', 'apellidos': 'Castro Valenzuela', 'email': 'sofia.castro@ejemplo.cl', 'telefono': '+56993456789', 'qr': 'FL-SOFI3062', 'plan': 'Plan Plus', 'estado_m': 'ACTIVA', 'dias_fin': 15},
             {'rut': '20.123.456-7', 'nombres': 'Diego', 'apellidos': 'Ruiz Carrasco', 'email': 'diego.ruiz@ejemplo.cl', 'telefono': '+56994567890', 'qr': 'FL-DIEG4073', 'plan': 'Plan Básico', 'estado_m': 'ACTIVA', 'dias_fin': 20},
-            {'rut': '19.456.789-0', 'nombres': 'Javiera', 'apellidos': 'Contreras Bravo', 'email': 'javiera.contreras@ejemplo.cl', 'telefono': '+56995678901', 'qr': 'FL-JAVI5084', 'plan': 'Plan Élite Anual', 'estado_m': 'ACTIVA', 'dias_fin': 280},
+            {'rut': '19.456.789-0', 'nombres': 'Javiera', 'apellidos': 'Contreras Bravo', 'email': 'javiera.contreras@ejemplo.cl', 'telefono': '+56995678901', 'qr': 'FL-JAVI5084', 'plan': 'Plan Premium', 'estado_m': 'ACTIVA', 'dias_fin': 20},
             {'rut': '17.890.123-8', 'nombres': 'Felipe', 'apellidos': 'Araya Guzmán', 'email': 'felipe.araya@ejemplo.cl', 'telefono': '+56996789012', 'qr': 'FL-FELI6095', 'plan': 'Plan Plus', 'estado_m': 'ACTIVA', 'dias_fin': 12},
             {'rut': '18.123.789-6', 'nombres': 'Constanza', 'apellidos': 'Muñoz Lagos', 'email': 'constanza.munoz@ejemplo.cl', 'telefono': '+56997890123', 'qr': 'FL-CONS7016', 'plan': 'Plan Plus', 'estado_m': 'ACTIVA', 'dias_fin': 18},
             {'rut': '19.234.890-5', 'nombres': 'Ignacio', 'apellidos': 'Herrera Parra', 'email': 'ignacio.herrera@ejemplo.cl', 'telefono': '+56998901234', 'qr': 'FL-IGNA8027', 'plan': 'Plan Plus', 'estado_m': 'ACTIVA', 'dias_fin': 22},
-            {'rut': '20.345.678-9', 'nombres': 'Carla', 'apellidos': 'Méndez Vidal', 'email': 'carla.mendez@ejemplo.cl', 'telefono': '+56999012345', 'qr': 'FL-CARL9038', 'plan': 'Plan Básico', 'estado_m': 'ACTIVA', 'dias_fin': 30},
+            {'rut': '20.345.678-9', 'nombres': 'Carla', 'apellidos': 'Méndez Vidal', 'email': 'carla.mendez@ejemplo.cl', 'telefono': '+56999012345', 'qr': 'FL-CARL9038', 'plan': 'Plan Básico', 'estado_m': 'ACTIVA', 'dias_fin': 29},
             {'rut': '16.987.654-1', 'nombres': 'Luis', 'apellidos': 'Ramírez Ortiz', 'email': 'luis.ramirez@ejemplo.cl', 'telefono': '+56990123456', 'qr': 'FL-LUIS1049', 'plan': 'Plan Plus', 'estado_m': 'ACTIVA', 'dias_fin': 8},
 
             # Caso 1 de prueba: Membresía VENCIDA (Intenta ingresar y se le debe denegar)
             {'rut': '16.789.012-3', 'nombres': 'Valentina', 'apellidos': 'Morales Sepúlveda', 'email': 'valentina.morales@ejemplo.cl', 'telefono': '+56991113355', 'qr': 'FL-VALE9991', 'plan': 'Plan Plus', 'estado_m': 'VENCIDA', 'dias_fin': -5},
 
             # Caso 2 de prueba: Membresía CONGELADA (Intenta ingresar y se le debe denegar por pausa)
-            {'rut': '18.901.234-5', 'nombres': 'Benjamín', 'apellidos': 'Soto Cárdenas', 'email': 'benjamin.soto@ejemplo.cl', 'telefono': '+56992224466', 'qr': 'FL-BENJ9992', 'plan': 'Plan Premium Trimestral', 'estado_m': 'CONGELADA', 'dias_fin': 45, 'motivo': 'Pausa médica por lesión en menisco rodilla derecha'},
+            {'rut': '18.901.234-5', 'nombres': 'Benjamín', 'apellidos': 'Soto Cárdenas', 'email': 'benjamin.soto@ejemplo.cl', 'telefono': '+56992224466', 'qr': 'FL-BENJ9992', 'plan': 'Plan Plus Trimestral', 'estado_m': 'CONGELADA', 'dias_fin': 45, 'motivo': 'Pausa temporal'},
 
             # Caso 3 de prueba: Socio con BAJA LÓGICA (Desactivado en sistema)
             {'rut': '17.654.321-0', 'nombres': 'Nicolás', 'apellidos': 'Tapia Poblete', 'email': 'nicolas.tapia@ejemplo.cl', 'telefono': '+56993335577', 'qr': 'FL-NICO9993', 'plan': 'Plan Plus', 'estado_m': 'ACTIVA', 'dias_fin': 10, 'activo': False},
@@ -158,7 +167,7 @@ class Command(BaseCommand):
             # Crear su membresía
             plan = planes_dict[s_data['plan']]
             fecha_fin = hoy + timedelta(days=s_data['dias_fin'])
-            fecha_inicio = fecha_fin - timedelta(days=plan.duracion_dias)
+            fecha_inicio = fecha_fin - timedelta(days=plan.duracion_dias - 1)
 
             membresia, created_m = Membresia.all_objects.get_or_create(
                 socio=socio,
@@ -186,11 +195,27 @@ class Command(BaseCommand):
         # 5. Creación de Clases Grupales y Escenarios de Ocupación
         # ----------------------------------------------------------------------
         self.stdout.write("5. Programando Clases Grupales y Lista de Espera FIFO...")
+        salas = {
+            'Sala Ciclo 1': Sala.objects.create(nombre='Sala Ciclo 1', capacidad=6, descripcion='Bicicletas para ciclismo indoor.'),
+            'Sala Armonía': Sala.objects.create(nombre='Sala Armonía', capacidad=15, descripcion='Espacio para yoga y pilates.'),
+            'Sala Funcional': Sala.objects.create(nombre='Sala Funcional', capacidad=12, descripcion='Espacio para entrenamiento funcional.'),
+        }
+        actividades = {
+            nombre: Actividad.objects.create(nombre=nombre, descripcion=descripcion)
+            for nombre, descripcion in [
+                ('Spinning', 'Ciclismo indoor.'),
+                ('Yoga', 'Movilidad, respiración y relajación.'),
+                ('Entrenamiento funcional', 'Ejercicios de fuerza y resistencia.'),
+                ('Pilates', 'Entrenamiento de postura y zona media.'),
+            ]
+        }
         clases_datos = [
             {
                 'nombre': 'Spinning Matutino Alta Intensidad',
                 'profesor': profesores_dict['Carlos'],
-                'fecha': hoy,
+                'fecha': hoy + timedelta(days=1),
+                'actividad': actividades['Spinning'],
+                'sala_asignada': salas['Sala Ciclo 1'],
                 'hora_inicio': time(8, 0),
                 'hora_fin': time(8, 50),
                 'capacidad_maxima': 6,  # Capacidad pequeña para demostrar sobrecupo y lista de espera
@@ -199,7 +224,9 @@ class Command(BaseCommand):
             {
                 'nombre': 'Yoga Restaurativo y Respiración',
                 'profesor': profesores_dict['Marta'],
-                'fecha': hoy,
+                'fecha': hoy + timedelta(days=1),
+                'actividad': actividades['Yoga'],
+                'sala_asignada': salas['Sala Armonía'],
                 'hora_inicio': time(10, 0),
                 'hora_fin': time(11, 0),
                 'capacidad_maxima': 15,
@@ -208,7 +235,9 @@ class Command(BaseCommand):
             {
                 'nombre': 'Entrenamiento Funcional HIIT',
                 'profesor': profesores_dict['Laura'],
-                'fecha': hoy,
+                'fecha': hoy + timedelta(days=1),
+                'actividad': actividades['Entrenamiento funcional'],
+                'sala_asignada': salas['Sala Funcional'],
                 'hora_inicio': time(18, 30),
                 'hora_fin': time(19, 20),
                 'capacidad_maxima': 12,
@@ -217,7 +246,9 @@ class Command(BaseCommand):
             {
                 'nombre': 'Pilates Core y Postura',
                 'profesor': profesores_dict['Ana'],
-                'fecha': hoy,
+                'fecha': hoy + timedelta(days=1),
+                'actividad': actividades['Pilates'],
+                'sala_asignada': salas['Sala Armonía'],
                 'hora_inicio': time(19, 30),
                 'hora_fin': time(20, 20),
                 'capacidad_maxima': 10,
